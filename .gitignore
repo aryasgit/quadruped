@@ -1,0 +1,23 @@
+# Python
+_pycache_/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+
+# Editor junk
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+*.swp
+
+# Virtual env (if any)
+venv/
+.env
