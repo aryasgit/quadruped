@@ -5,6 +5,7 @@ import tkinter as tk
 # ==================================================
 # I2C CONFIG (HARDWARE — DO NOT TWEAK)
 # ==================================================
+servo_angles = {}
 BUS = 7
 MPU_ADDR = 0x68
 PCA_ADDR = 0x40
@@ -42,16 +43,16 @@ SHOULDERS = {
 }
 
 SHOULDER_MAX_OFFSET = {
-    "FR": 25.0,
-    "FL": 25.0,
-    "RR": 25.0,
-    "RL": 25.0,
+    "FR": 35.0,
+    "FL": 35.0,
+    "RR": 30.0,
+    "RL": 30.0,
 }
 
 # Neutral standing angles (MEASURED, DO NOT GUESS)
 SHOULDER_STAND = {
-    "FR": 41,
-    "FL": 41,
+    "FR": 37,
+    "FL": 46,
     "RR": 38,
     "RL": 38,
 }
@@ -92,10 +93,10 @@ FEET = {
 
 # Neutral standing angles (MEASURED)
 FOOT_STAND = {
-    "FRF": 128,
+    "FRF": 130,
     "FLF": 61,
-    "RRF": 142,
-    "RLF": 61,
+    "RRF": 128,
+    "RLF": 77,
 }
 
 # Direction mapping:
@@ -189,6 +190,23 @@ def set_servo_angle(ch, angle):
     bus.write_byte_data(PCA_ADDR, base + 2, pulse & 0xFF)
     bus.write_byte_data(PCA_ADDR, base + 3, (pulse >> 8) & 0x0F)
 
+# ==================================================
+# MID-LIMB (HIP) LOCK — ONE-TIME INITIALIZATION
+# ==================================================
+# These joints are posture-locked and NOT controlled further
+
+MID_LIMBS = {
+    8: 104,   # FRM
+    9: 165,   # FLM
+    2: 102,   # RRM
+    3: 154,   # RLM
+}
+
+for ch, angle in MID_LIMBS.items():
+    set_servo_angle(ch, angle)
+    servo_angles[ch] = angle
+    time.sleep(0.02)
+    
 # ==================================================
 # DEVICE INITIALIZATION (DO NOT TWEAK)
 # ==================================================
@@ -287,10 +305,45 @@ UNLOAD_POSTURE = {
     "RLF": {"roll": -POSTURE_MAX_ROLL, "pitch": +POSTURE_MAX_PITCH},
 }
 
-# FSM for simple unload + lift of a single leg (start disabled)
-swing_leg = None        # e.g. "FRF" when commanded
-fsm_state = "IDLE"      # IDLE / UNLOADING / LIFTING / DONE
+# ==================================================
+# SHOULDER GEOMETRIC UNLOAD MAP (AUTHORITATIVE)
+# Positive = outward, Negative = inward
+# ==================================================
+UNLOAD_SHOULDER_OFFSETS = {
+    # Lifting FRONT RIGHT foot
+    "FRF": {
+        "RR": +6.0,
+        "RL": +6.0,
+        "FL": -5.0,
+        "FR":  0.0,
+    },
+    # Lifting FRONT LEFT foot
+    "FLF": {
+        "RR": +8.0,
+        "RL": +8.0,
+        "FR": -10.0,
+        "FL":  0.0,
+    },
+    # Lifting REAR RIGHT foot
+    "RRF": {
+        "FR": +7.0,
+        "FL": +7.0,
+        "RL": -15.0,
+        "RR":  0.0,
+    },
+    # Lifting REAR LEFT foot
+    "RLF": {
+        "FR": +5.0,
+        "FL": +5.0,
+        "RR": -10.0,
+        "RL":  0.0,
+    },
+}
 
+# FSM for simple unload + lift of a single leg (start disabled)
+swing_leg = "FLF"        # e.g. "FRF" when commanded
+fsm_state = "IDLE"      # IDLE / UNLOADING / LIFTING / DONE
+disable_roll_pd = False
 
 
 # LIFT parameters
@@ -338,7 +391,7 @@ monitor_state = {
 
 
 # store last commanded servo angles
-servo_angles = {}
+
 
 for leg, ch in SHOULDERS.items():
     servo_angles[ch] = SHOULDER_STAND[leg]
@@ -530,37 +583,47 @@ while True:
                 posture_roll_target  = UNLOAD_POSTURE[swing_leg]["roll"]
                 posture_pitch_target = UNLOAD_POSTURE[swing_leg]["pitch"]
                 unload_start = time.time()
+
+                # IMPORTANT: freeze roll PD application
+                disable_roll_pd = True
+
                 fsm_state = "UNLOADING"
 
         elif fsm_state == "UNLOADING":
-            # REPLACE — improved unloading detection (uses controller effort + offset change)
-            # UNLOADED when:
-            #  - IMU near posture bias (small angular error)
-            #  - roll controller effort is low (controller relaxed)
-            #  - shoulder offset changes are small (no more balancing adjustments)
+            # ==================================================
+            # AUTHORITATIVE SHOULDER UNLOADING (NO PD FIGHT)
+            # ==================================================
+            for shoulder in SHOULDERS:
+                # Body-space unload command (positive = outward, negative = inward)
+                body_target = UNLOAD_SHOULDER_OFFSETS[swing_leg].get(shoulder, 0.0)
+
+                # Convert body-space direction → servo-space direction
+                servo_target = SHOULDER_SIGN[shoulder] * body_target
+
+                motion_offsets[shoulder] = ramp(
+                    motion_offsets[shoulder],
+                    servo_target,
+                    0.8
+                )
+            # -------- UNLOADED DETECTION (READ-ONLY) --------
             UNLOADED = (
                 abs(roll  - posture_roll_bias)  < UNLOAD_SETTLE_THRESH and
                 abs(pitch - posture_pitch_bias) < UNLOAD_SETTLE_THRESH and
-                roll_effort < 0.15 and                # controller slow to change (tunable)
-                offset_change < 0.05                  # shoulder offsets nearly steady (tunable)
+                roll_effort < 0.15 and
+                offset_change < 0.05
             )
-
-            # ADD — publish unload boolean for GUI
             monitor_state["unloaded"] = bool(UNLOADED)
-
             if UNLOADED and (time.time() - unload_start) > 0.5:
-                # confirmed unload — proceed to lift
                 fsm_state = "LIFTING"
 
         elif fsm_state == "LIFTING":
             current = motion_offsets[swing_leg]
             motion_offsets[swing_leg] = ramp(current, LIFT_HEIGHT, LIFT_STEP)
-
             if abs(motion_offsets[swing_leg] - LIFT_HEIGHT) < 0.5:
                 fsm_state = "DONE"
 
         elif fsm_state == "DONE":
-            pass  # hold for now
+            disable_roll_pd = False
 
         # ---------- ROLL REFLEX ----------
         # Shoulders widen/narrow stance to resist tipping
@@ -584,7 +647,8 @@ while True:
         
 
         for leg, ch in SHOULDERS.items():
-            delta = roll_cmd - roll_offsets[leg]
+            applied_cmd = 0.0 if disable_roll_pd else roll_cmd
+            delta = applied_cmd - roll_offsets[leg]
             delta = max(-ROLL_STEP, min(ROLL_STEP, delta))
             if abs(delta) < 0.05:
                 delta = 0.0
