@@ -133,18 +133,11 @@ PITCH_STEP = 1.5     # Knee speed (deg per cycle)
 PITCH_LIMIT = 25.0   # Max knee offset (SAFETY)
 K_PITCH_RATE = 0.03  # Pitch-rate feedforward(start conservative)
 
-# ---------- LEG UNLOADING (EXPERIMENTAL) ----------
-UNLOAD_LEG = "FLF"      # target leg
-UNLOAD_KNEE_BIAS = +8.0 # degrees (negative = unload)
-SUPPORT_KNEE_BIAS = -5.0
-UNLOAD_RAMP = 0.15      # smoothing factor (0–1)
-UNLOAD_SHOULDER_BIAS = 3.0
-UNLOAD_PITCH_COMP = 4.0
-
 # IMU noise rejection
 ACCEL_DEADBAND = 50
 GYRO_DEADBAND = 10
 GYRO_RATE_DEADBAND = 1.5 
+
 bus = SMBus(BUS)
 
 # ==================================================
@@ -241,8 +234,7 @@ gx_o /= 200; gy_o /= 200
 # ==================================================
 roll = 0.0
 pitch = 0.0
-unload_offsets = {k : 0.0  for k in FEET}
-shoulder_unload = {k : 0.0  for k in SHOULDERS}
+
 # These store smooth joint offsets
 roll_offsets = {k: 0.0 for k in SHOULDERS}
 pitch_offsets = {k: 0.0 for k in FEET}
@@ -250,13 +242,33 @@ pitch_offsets = {k: 0.0 for k in FEET}
 print("Layer-1 Roll + Pitch ACTIVE (±30°)\n")
 
 # ==================================================
+# BRACE STATE (NEW)
+# ==================================================
+BRACE_ACCEL_THRESHOLD = 3000     # raw accel delta
+BRACE_DURATION = 0.25            # seconds
+BRACE_GAIN_SCALE = 0.6           # soften controller
+BRACE_MAX_BIAS = 12.0            # deg (keep small)
+
+brace_active = False
+brace_until = 0.0
+
+brace_roll_bias = 0.0
+brace_pitch_bias = 0.0
+
+last_ax = last_ay = last_az = 0.0
+
+# ==================================================
 # MONITOR STATE (READ-ONLY)
 # ==================================================
 monitor_state = {
     "roll": 0.0,
     "pitch": 0.0,
-    
-    # Raw acceleration (for impact / brace logic later)
+
+    "brace": False,
+    "brace_roll_bias": 0.0,
+    "brace_pitch_bias": 0.0,
+
+    # Raw acceleration
     "ax": 0.0,
     "ay": 0.0,
     "az": 0.0,
@@ -291,9 +303,14 @@ def start_monitor_gui():
     az_var = tk.StringVar()
     roll_var = tk.StringVar()
     pitch_var = tk.StringVar()
-
+    brace_var = tk.StringVar()
+    brace_roll_var = tk.StringVar()
+    brace_pitch_var = tk.StringVar()
     tk.Label(imu_frame, textvariable=roll_var, font=("Arial", 12)).pack(anchor="w")
     tk.Label(imu_frame, textvariable=pitch_var, font=("Arial", 12)).pack(anchor="w")
+    tk.Label(imu_frame, textvariable=brace_var, font=("Arial", 12)).pack(anchor="w")
+    tk.Label(imu_frame, textvariable=brace_roll_var, font=("Arial", 12)).pack(anchor="w")
+    tk.Label(imu_frame, textvariable=brace_pitch_var, font=("Arial", 12)).pack(anchor="w")
     tk.Label(accel_frame, textvariable=ax_var, font=("Arial", 10)).pack(anchor="w")
     tk.Label(accel_frame, textvariable=ay_var, font=("Arial", 10)).pack(anchor="w")
     tk.Label(accel_frame, textvariable=az_var, font=("Arial", 10)).pack(anchor="w")
@@ -318,6 +335,9 @@ def start_monitor_gui():
     def update():
         roll_var.set(f"Roll  : {monitor_state['roll']:+6.2f}°")
         pitch_var.set(f"Pitch : {monitor_state['pitch']:+6.2f}°")
+        brace_var.set("Brace : ACTIVE" if monitor_state["brace"] else "Brace : off")
+        brace_roll_var.set(f"Brace Roll Bias  : {monitor_state['brace_roll_bias']:+6.2f}°")
+        brace_pitch_var.set(f"Brace Pitch Bias : {monitor_state['brace_pitch_bias']:+6.2f}°")
         ax_var.set(f"AX : {monitor_state['ax']:6.0f}")
         ay_var.set(f"AY : {monitor_state['ay']:6.0f}")
         az_var.set(f"AZ : {monitor_state['az']:6.0f}")
@@ -345,6 +365,35 @@ while True:
         az = safe_read_word(MPU_ADDR, ACCEL_XOUT_H + 4) - az_o
         gx = safe_read_word(MPU_ADDR, GYRO_XOUT_H) - gx_o
         gy = safe_read_word(MPU_ADDR, GYRO_XOUT_H + 2) - gy_o
+        
+        # ---------- BRACE DETECTION ----------
+        dax = ax - last_ax
+        day = ay - last_ay
+        daz = az - last_az
+        last_ax, last_ay, last_az = ax, ay, az
+
+        delta_a = math.sqrt(dax*dax + day*day + daz*daz)
+
+        now = time.time()
+
+        if (delta_a > BRACE_ACCEL_THRESHOLD) and not brace_active:
+            brace_active = True
+            brace_until = now + BRACE_DURATION
+
+            mag = max(delta_a, 1.0)
+            brace_pitch_bias = -dax / mag * BRACE_MAX_BIAS
+            brace_roll_bias  = -day / mag * BRACE_MAX_BIAS
+            
+            # ---------- BRACE DECAY ----------
+        if brace_active:
+            if now > brace_until:
+                brace_active = False
+                brace_roll_bias = 0.0
+                brace_pitch_bias = 0.0
+            else:
+                # gentle decay inside brace window
+                brace_roll_bias *= 0.92
+                brace_pitch_bias *= 0.92
 
         # Noise suppression
         if abs(ax) < ACCEL_DEADBAND: ax = 0
@@ -365,7 +414,9 @@ while True:
         
         monitor_state["roll"] = roll
         monitor_state["pitch"] = pitch
-        
+        monitor_state["brace"] = brace_active
+        monitor_state["brace_roll_bias"] = brace_roll_bias
+        monitor_state["brace_pitch_bias"] = brace_pitch_bias
         monitor_state["ax"] = ax
         monitor_state["ay"] = ay
         monitor_state["az"] = az
@@ -376,21 +427,12 @@ while True:
 
         # ---------- ROLL REFLEX ----------
         # Shoulders widen/narrow stance to resist tipping
+        gain_scale = BRACE_GAIN_SCALE if brace_active else 1.0
         roll_rate = gx / 131.0      #deg/s
         if abs(roll_rate) < GYRO_RATE_DEADBAND:
             roll_rate = 0.0
-        roll_cmd = -(K_ROLL * roll + K_ROLL_RATE * roll_rate)
+        roll_cmd = -(gain_scale * (K_ROLL * roll + K_ROLL_RATE * roll_rate)) + brace_roll_bias
         roll_cmd = max(-ROLL_LIMIT, min(ROLL_LIMIT, roll_cmd))
-        
-        # ---------- FLF SHOULDER UNLOADING ----------
-        for leg in SHOULDERS:
-            if leg.startswith("FL"):
-                target = -UNLOAD_SHOULDER_BIAS
-            if leg.startswith("FL"):
-                target = +UNLOAD_SHOULDER_BIAS       # push body RIGHT
-            else:
-                target = 0.0  # distribute load
-            shoulder_unload[leg] += 0.1 * (target - shoulder_unload[leg])
 
         for leg, ch in SHOULDERS.items():
             delta = roll_cmd - roll_offsets[leg]
@@ -404,7 +446,7 @@ while True:
                 min(SHOULDER_MAX_OFFSET[leg], roll_offsets[leg])
             )   
 
-            angle = SHOULDER_STAND[leg] + roll_offsets[leg] + shoulder_unload[leg]
+            angle = SHOULDER_STAND[leg] + roll_offsets[leg]
             set_servo_angle(ch, angle)
             servo_angles[ch]=angle
             
@@ -416,25 +458,7 @@ while True:
             pitch_rate = gy / 131.0     # deg/s
             if abs(pitch_rate) < GYRO_RATE_DEADBAND:
                 pitch_rate = 0.0
-            tgt = (K_PITCH * pitch + K_PITCH_RATE * pitch_rate)
-
-            # ---------- FLF UNLOADING ----------
-            if leg == UNLOAD_LEG:
-                unload_target = UNLOAD_KNEE_BIAS          # positive = unload
-            else:
-                unload_target = SUPPORT_KNEE_BIAS         # small negative
-
-            # Smooth unload application
-            unload_offsets[leg] += UNLOAD_RAMP * (unload_target - unload_offsets[leg])
-
-            # Apply unload in BODY space, then map to joint
-            if leg.startswith("F"):
-                tgt += unload_offsets[leg]                # front: flex to unload
-            else:
-                tgt -= unload_offsets[leg]                # rear: extend to support
-
-            # Convert to joint direction
-            tgt *= (1 if leg.startswith("F") else -1)
+            tgt = (gain_scale * (K_PITCH * pitch + K_PITCH_RATE * pitch_rate)+ brace_pitch_bias) * (1 if leg.startswith("F") else -1)
             tgt = max(-PITCH_LIMIT, min(PITCH_LIMIT, tgt))
 
             delta = tgt - pitch_offsets[leg]
