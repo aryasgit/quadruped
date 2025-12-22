@@ -1,0 +1,49 @@
+A. What your plots are telling you (important)
+1️⃣ Roll vs posture_roll (top plot)
+
+You did a slow manual tilt → perfect input.
+
+Roll smoothly goes from ~−30° → +25° → −30° → +25°
+✔️ IMU + complementary filter are working
+✔️ No sudden jumps → wiring & filtering are solid
+
+posture_roll is flat at 0
+✔️ Good: no unintended posture bias creeping in
+✔️ Confirms your Layer-2 posture logic isn’t leaking
+
+Conclusion:
+Your state estimation is trustworthy. This is huge.
+
+2️⃣ roll_effort & offset_change (middle plot)
+
+This plot is 🔥.
+
+roll_effort spikes when roll crosses through 0 or reverses
+
+High effort during steep slopes (around ±15–25°)
+
+Lower effort near extremes → makes sense (PD is saturated / steady)
+
+offset_change tracks effort closely → this means:
+
+“The controller is actually moving shoulders in response to tilt”
+
+That’s exactly what you want.
+
+Conclusion:
+Your roll controller is alive, responsive, and mechanically coupled to reality.
+
+3️⃣ brace (bottom plot)
+
+Brace fired once at the beginning
+
+Stayed off during slow tilt
+
+✔️ Perfect behavior
+Brace should:
+
+Trigger on impacts / sudden disturbances
+
+NOT trigger on slow tilts
+
+This confirms your brace threshold & decay logic are correct.

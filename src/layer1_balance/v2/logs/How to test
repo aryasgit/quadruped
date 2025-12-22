@@ -1,0 +1,279 @@
+🧪 WHAT TO DO WHILE THE PROGRAM RUNS
+
+Think of this like a controlled experiment, not random poking.
+
+I’ll break this into phases. You don’t need to do all of them in one run, but this is the ideal sequence.
+
+🟢 PHASE 0 — BASELINE (VERY IMPORTANT)
+
+Duration: ~10 seconds
+What to do:
+👉 Do absolutely nothing.
+Let the robot stand still.
+
+Why this matters:
+
+Verifies IMU noise floor
+
+Confirms PD + filter stability
+
+Establishes reference roll_effort & offset_change
+
+Expected in plots:
+
+roll ≈ 0
+
+posture_roll_bias ≈ 0
+
+roll_effort ≈ very small
+
+offset_change ≈ very small
+
+brace = 0
+
+If this isn’t clean → tuning issue, not gait issue.
+
+🟡 PHASE 1 — SLOW MANUAL TILT (QUASI-STATIC)
+
+Duration: ~15 seconds
+What to do:
+
+Gently tilt the robot left
+
+Hold for ~2–3 seconds
+
+Return to center
+
+Repeat to the right
+
+Then front / back (pitch)
+
+Rules:
+
+No jerks
+
+No impacts
+
+Think “examiner tilting a scale”
+
+What this tests:
+
+Complementary filter correctness
+
+Roll & pitch PD signs
+
+Shoulder + foot symmetry
+
+Expected plots:
+
+roll follows your tilt
+
+posture_roll_bias stays ≈ 0
+
+roll_effort rises smoothly
+
+no brace activation
+
+🚫 If brace triggers here → threshold too low.
+
+🟠 PHASE 2 — STEP DISTURBANCE (BRACE TEST)
+
+Duration: ~10 seconds
+What to do:
+
+Give a short, firm tap to:
+
+shoulder region (roll)
+
+torso front/back (pitch)
+
+One push at a time
+
+Let it recover fully before next
+
+Do NOT shove continuously.
+
+What this tests:
+
+Brace detection
+
+Brace decay
+
+Gain scaling effectiveness
+
+Expected plots:
+
+roll spikes briefly
+
+brace goes 0 → 1 → 0
+
+roll_effort spikes
+
+posture_roll_bias remains stable
+
+If brace doesn’t trigger → threshold too high
+If it sticks → decay bug
+
+🔵 PHASE 3 — UNLOAD ONLY (NO LIFT)
+
+Duration: ~15 seconds
+What to do:
+
+Click Unload FRF
+
+Let posture settle
+
+Don’t lift yet
+
+Observe stance widening
+
+Then:
+
+Resume
+
+Repeat for FLF / RRF / RLF
+
+What this tests:
+
+UNLOAD_POSTURE correctness
+
+SHOULDER_OFFSETS geometry
+
+posture_roll_bias ramping
+
+Expected plots:
+
+posture_roll_bias moves toward target
+
+roll follows posture
+
+offset_change increases slightly
+
+brace stays 0
+
+🔴 PHASE 4 — UNLOAD + LIFT (CONTROLLED)
+
+Duration: ~10 seconds per leg
+What to do:
+
+Unload a leg
+
+Press Lift
+
+Hold for 2–3 seconds
+
+Press Lower
+
+Resume
+
+What this tests:
+
+Foot sign correctness
+
+Motion offset layering
+
+FSM transitions
+
+Expected plots:
+
+pitch shifts slightly
+
+roll remains controlled
+
+no oscillation
+
+clean return to baseline
+
+🛑 HOW TO EXIT SAFELY (VERY IMPORTANT)
+❌ Do NOT just close terminal
+❌ Do NOT power off
+✅ CORRECT WAY TO EXIT
+Option 1 — Keyboard Interrupt (BEST)
+
+Press:
+
+Ctrl + C
+
+
+Your program will:
+
+exit the loop
+
+flush file buffers
+
+keep CSV intact
+
+If you want to be extra safe, add this at the very bottom of your file:
+
+except KeyboardInterrupt:
+    print("\nExiting cleanly...")
+    if LOG_ENABLE:
+        log_f.close()
+    break
+
+
+(If you want, I can give you the exact placement.)
+
+✅ VERIFY LOG SAVED
+
+After exit:
+
+ls -lh run_log.csv
+
+
+You should see:
+
+non-zero file size
+
+timestamp updated
+
+Then:
+
+head run_log.csv
+tail run_log.csv
+
+
+To confirm content.
+
+🧠 HOW MANY RUNS SHOULD YOU DO?
+
+Ideal:
+
+1 run = 1 hypothesis
+
+Don’t mix too many behaviors per run
+
+Example runs:
+
+Baseline + slow tilt
+
+Brace only
+
+Unload only
+
+Unload + lift
+
+Label them by renaming logs:
+
+mv run_log.csv log_unload_frf.csv
+
+🔥 WHAT WE’LL DO NEXT (AFTER YOU PLOT)
+
+Once you show me:
+
+“roll vs posture” plot
+
+or describe its shape
+
+We can:
+
+tune ALPHA properly
+
+tune K_ROLL using real data
+
+auto-detect unloading readiness
+
+eventually resurrect crawl cleanly
+
+You’re now doing real robotics, not guesswork.
+Run Phase 0 → Phase 1 first and tell me what you see.

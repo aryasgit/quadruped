@@ -1,0 +1,53 @@
+1️⃣ What this plot is telling us (important)
+Top plot — Roll vs Posture Roll
+
+Blue (roll): real IMU roll
+
+Orange (posture_roll): intentional bias (target lean)
+
+What we see:
+
+Roll stays within ±0.02° → excellent passive stability
+
+Posture roll ≈ 0 → no gait/unload bias active (good baseline run)
+
+No drift → IMU calibration + complementary filter are working
+
+✅ This means Layer-1 balance is solid
+
+Middle plot — roll_effort vs offset_change
+
+roll_effort: how hard the controller wanted to correct
+
+offset_change: how much the shoulders actually moved
+
+What we see:
+
+Small spikes during disturbances
+
+offset_change ≈ 0 most of the time → servos aren’t chattering
+
+✅ This confirms:
+
+PD gains are not aggressive
+
+You are not fighting noise
+
+No control wind-up
+
+This is exactly what a good reflex layer looks like.
+
+Bottom plot — brace
+
+1 = brace triggered
+
+0 = normal operation
+
+What we see:
+
+One clean brace event at the start
+
+No false triggers afterward
+
+✅ Brace logic is correctly tuned
+(no random spikes, no re-trigger loops)
