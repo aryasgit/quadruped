@@ -433,14 +433,14 @@ monitor_state = {
 }
 
 # ==================================================
-# UNIFIED MESSY DARK CONTROL + DIAGNOSTICS GUI
+# FINAL UNIFIED MESSY DARK CONTROL + DIAGNOSTICS GUI
 # ==================================================
 def start_unified_gui():
     global gui_selected_leg, gui_lift_active, gui_resume_request
 
     root = tk.Tk()
     root.title("QUADRUPED // CONTROL // DIAGNOSTICS")
-    root.geometry("1000x620")
+    root.geometry("1100x680")
     root.configure(bg="#0b0b0b")
 
     # ---------------- Fonts ----------------
@@ -464,7 +464,7 @@ def start_unified_gui():
 
     tk.Label(
         header,
-        text="balance • posture FSM • foot contact • reflex layer",
+        text="balance • posture FSM • foot contact • reflex layer • diagnostics",
         font=FONT_MONO,
         fg="#9a9a9a",
         bg="#111111"
@@ -474,7 +474,7 @@ def start_unified_gui():
     main = tk.Frame(root, bg="#0b0b0b")
     main.pack(fill="both", expand=True, padx=8, pady=8)
 
-    left  = tk.Frame(main, bg="#151515", width=280)
+    left  = tk.Frame(main, bg="#151515", width=300)
     right = tk.Frame(main, bg="#151515")
 
     left.pack(side="left", fill="y", padx=(0, 8))
@@ -506,7 +506,7 @@ def start_unified_gui():
     tk.Label(left, text="ACTIVE LEG:", font=FONT_MONO, fg="#9a9a9a", bg="#151515").pack(anchor="w", padx=10, pady=(6, 0))
     tk.Label(left, textvariable=selected_leg_var, font=FONT_MONO, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10)
 
-    def lift():   # unchanged logic
+    def lift():
         global gui_lift_active
         gui_lift_active = True
 
@@ -553,6 +553,7 @@ def start_unified_gui():
     contact_frame.pack(fill="x", padx=10)
 
     contact_bars = {}
+    last_contact = {k: 1.0 for k in ["FRF","FLF","RRF","RLF"]}
 
     for leg in ["FRF", "FLF", "RRF", "RLF"]:
         row = tk.Frame(contact_frame, bg="#151515")
@@ -571,7 +572,7 @@ def start_unified_gui():
 
         contact_bars[leg] = (bar_fg, val_lbl)
 
-    # ---------------- Footer ----------------
+    # ---------------- Footer / Timeline ----------------
     status_var = tk.StringVar()
     tk.Label(
         root,
@@ -603,8 +604,16 @@ def start_unified_gui():
 
         for leg, (bar, lbl) in contact_bars.items():
             c = monitor_state["foot_contact"].get(leg, 0.0)
-            bar.config(width=int(220 * c))
+            bar.config(width=int(240 * c))
             lbl.config(text=f"{c:.2f}")
+
+            # flash on touchdown
+            if c > 0.8 and last_contact[leg] < 0.3:
+                bar.config(bg="#ffffff")
+            else:
+                bar.config(bg="#e6e6e6")
+
+            last_contact[leg] = c
 
         status_var.set(
             f"{fsm_state} | swing={swing_leg} | "
