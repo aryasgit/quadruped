@@ -160,6 +160,15 @@ last_printed_contact = 1.0
 CONTACT_PRINT_EPS = 0.08   # print only on meaningful change
 
 # ==================================================
+# STEP PRIMITIVE (SEALED)
+# A STEP consists of:
+# UNLOADING → LIFTING → DONE → RECENTERING → CONTACT → IDLE
+# Once contact is detected, the step is considered COMPLETE.
+# No external code should interfere mid-step.
+# ==================================================
+step_active = False
+
+# ==================================================
 # DATA LOGGER (NON-BLOCKING)
 # ==================================================
 LOG_ENABLE = True
@@ -429,7 +438,13 @@ monitor_state = {
     
     #foot contact confidence 0 to 1
     "foot_contact": {},
-    "leg_motion_response": {}
+    "leg_motion_response": {},
+    
+    # STEP diagnostics
+    "step_phase": "IDLE",
+    "step_active": False,
+    "last_step_ok": True
+    
 }
 
 # ==================================================
@@ -541,10 +556,33 @@ def start_unified_gui():
     imu_var   = tk.StringVar()
     fsm_var   = tk.StringVar()
     brace_var = tk.StringVar()
+    step_phase_var = tk.StringVar()
+    step_active_var = tk.StringVar()
+    step_ok_var = tk.StringVar()
 
     tk.Label(right, textvariable=imu_var, font=FONT_MONO, fg="#e6e6e6", bg="#151515", justify="left").pack(anchor="w", padx=10)
     tk.Label(right, textvariable=fsm_var, font=FONT_HDR, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=4)
     tk.Label(right, textvariable=brace_var, font=FONT_MONO, fg="#9a9a9a", bg="#151515").pack(anchor="w", padx=10)
+    tk.Label(
+    right,
+    textvariable=step_phase_var,
+    font=FONT_HDR,
+    fg="#ffffff",
+    bg="#151515").pack(anchor="w", padx=10, pady=(6, 0))
+
+    tk.Label(
+        right,
+        textvariable=step_active_var,
+        font=FONT_MONO,
+        fg="#9a9a9a",
+        bg="#151515").pack(anchor="w", padx=10)
+
+    tk.Label(
+        right,
+        textvariable=step_ok_var,
+        font=FONT_MONO,
+        fg="#9a9a9a",
+        bg="#151515").pack(anchor="w", padx=10, pady=(0, 6))
 
     # ---------------- Foot Contact ----------------
     tk.Label(right, text="FOOT CONTACT", font=FONT_HDR, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(10, 4))
@@ -593,6 +631,13 @@ def start_unified_gui():
 
         fsm_var.set(f"FSM STATE : {fsm_state}")
         brace_var.set("BRACE : ACTIVE" if monitor_state["brace"] else "BRACE : off")
+        step_phase_var.set(f"STEP PHASE : {monitor_state['step_phase']}")
+        step_active_var.set(f"STEP ACTIVE : {monitor_state['step_active']}")
+        step_ok_var.set(
+            "LAST STEP : OK"
+            if monitor_state["last_step_ok"]
+            else "LAST STEP : WARN"
+        )
 
         raw_state.set(
             f"fsm={fsm_state}\n"
@@ -768,6 +813,8 @@ while True:
         monitor_state["brace_roll_bias"] = brace_roll_bias
         monitor_state["brace_pitch_bias"] = brace_pitch_bias
         monitor_state["fsm_state"] = fsm_state
+        monitor_state["step_active"] = step_active
+        monitor_state["step_phase"] = fsm_state
         monitor_state["ax"] = ax
         monitor_state["ay"] = ay
         monitor_state["az"] = az
@@ -776,23 +823,28 @@ while True:
         # APPLY GUI RESUME REQUEST
         # ==================================================
         if gui_resume_request:
-            # cancel unloading & lifting
+            # Cancel any active step
             swing_leg = None
             gui_selected_leg = None
             gui_lift_active = False
+            step_active = False
 
-            # clear posture targets
+            # Clear posture targets
             posture_roll_target = 0.0
             posture_pitch_target = 0.0
 
-            # clear all motion offsets (shoulders + knees)
+            # Clear all motion offsets (shoulders + feet)
             for k in motion_offsets:
                 motion_offsets[k] = 0.0
 
-            # re-enable balance controller
+            # IMPORTANT: force foot contact recovery
+            for leg in FEET:
+                foot_contact[leg] = 1.0
+
+            # Restore balance controller
             disable_roll_pd = False
 
-            # reset FSM
+            # Go through recentering so biases settle cleanly
             fsm_state = "RECENTERING"
 
             gui_resume_request = False
@@ -834,6 +886,7 @@ while True:
             
         if fsm_state == "IDLE":
             if swing_leg is not None:
+                step_active = True
                 posture_roll_target  = UNLOAD_POSTURE[swing_leg]["roll"]
                 posture_pitch_target = UNLOAD_POSTURE[swing_leg]["pitch"]
                 unload_start = time.time()
@@ -924,8 +977,59 @@ while True:
 
                 swing_leg = None
                 gui_selected_leg = None
-                fsm_state = "IDLE"        
+                fsm_state = "IDLE"    
+                    
+        # ==================================================
+        # STEP COMPLETION — CONTACT-GATED (FINAL)
+        # ==================================================
+        if (
+            step_active
+            and swing_leg is not None
+            and not gui_lift_active
+            and foot_contact[swing_leg] > 0.75
+            and fsm_state in ("DONE", "RECENTERING")
+        ):
+            completed_leg = swing_leg
+            # Clear posture intent
+            posture_roll_target  = 0.0
+            posture_pitch_target = 0.0
 
+            # Clear motion offsets
+            for k in motion_offsets:
+                motion_offsets[k] = 0.0
+
+            # Reset roll offsets cleanly
+            for k in roll_offsets:
+                roll_offsets[k] = 0.0
+
+            # Restore balance controller
+            disable_roll_pd = False
+
+            # Clear step state
+            swing_leg = None
+            gui_selected_leg = None
+            step_active = False
+            
+
+            # FSM returns to neutral
+            monitor_state["last_step_ok"] = (foot_contact[completed_leg] > 0.75)
+            fsm_state = "IDLE"
+            
+        # ==================================================
+        # STEP INVARIANT CHECK (DEBUG / SAFE)
+        # ==================================================
+        if fsm_state == "IDLE" and not step_active:
+            # Ownership must be fully released
+            assert swing_leg is None
+            assert disable_roll_pd is False
+
+            # Posture bias must be within absolute safety bounds
+            assert abs(posture_roll_bias) <= POSTURE_MAX_ROLL
+            assert abs(posture_pitch_bias) <= POSTURE_MAX_PITCH
+
+            # Motion offsets must be cleared
+            assert all(abs(motion_offsets[k]) < RECENTER_THRESH for k in motion_offsets)
+       
         # ---------- ROLL REFLEX ----------
         # Shoulders widen/narrow stance to resist tipping
         gain_scale = BRACE_GAIN_SCALE if brace_active else 1.0
