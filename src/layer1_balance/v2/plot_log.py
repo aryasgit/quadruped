@@ -1,9 +1,3 @@
-# Copyright (c) 2025 Aryaman Gupta
-# All Rights Reserved.
-#
-# This code is proprietary.
-# Unauthorized use, modification, or distribution is prohibited.
-
 import pandas as pd
 import matplotlib.pyplot as plt
 

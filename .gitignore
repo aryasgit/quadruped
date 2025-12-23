@@ -21,3 +21,4 @@ Thumbs.db
 # Virtual env (if any)
 venv/
 .env
+run_log.csv

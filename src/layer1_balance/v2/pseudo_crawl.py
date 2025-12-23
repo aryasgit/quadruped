@@ -1,9 +1,3 @@
-# Copyright (c) 2025 Aryaman Gupta
-# All Rights Reserved.
-#
-# This code is proprietary.
-# Unauthorized use, modification, or distribution is prohibited.
-
 import time, math, errno
 from smbus2 import SMBus
 import threading 
@@ -172,8 +166,64 @@ CONTACT_PRINT_EPS = 0.08   # print only on meaningful change
 # Once contact is detected, the step is considered COMPLETE.
 # No external code should interfere mid-step.
 # ==================================================
+
 step_active = False
 
+# ==================================================
+# GAIT SEQUENCER (SAFE, EVENT-DRIVEN)
+# ==================================================
+
+GAIT_SEQUENCE = ["FRF", "RLF", "FLF", "RRF"]  # crawl gait (diagonal support)
+
+gait_enabled = False
+gait_index = 0
+
+# ==================================================
+# PUBLIC STEP API (THE ONLY ENTRY POINT)
+# ==================================================
+def request_step(leg):
+    """
+    Safely request a single step.
+    This is the ONLY allowed way to initiate unload + lift.
+    Returns True if accepted, False if rejected.
+    """
+    global swing_leg, step_active
+
+    # Reject invalid legs
+    if leg not in FEET:
+        return False
+
+    # Reject if a step is already running
+    if step_active or fsm_state != "IDLE":
+        return False
+
+    # Arm step
+    swing_leg = leg
+    step_active = True
+
+    return True
+
+def gait_tick():
+    """
+    One tick of the gait sequencer.
+    Requests the next step only if the system is ready.
+    """
+    global gait_index
+
+    if not gait_enabled:
+        return
+
+    # Do nothing if a step is still running
+    if step_active:
+        return
+
+    # Request next leg
+    leg = GAIT_SEQUENCE[gait_index]
+    accepted = request_step(leg)
+
+    if accepted:
+        gait_index = (gait_index + 1) % len(GAIT_SEQUENCE)
+        
 # ==================================================
 # DATA LOGGER (NON-BLOCKING)
 # ==================================================
@@ -396,8 +446,6 @@ disable_roll_pd = False
 # GUI COMMAND STATE (INTENT ONLY)
 # ==================================================
 gui_selected_leg = None      # "FRF", "FLF", "RRF", "RLF"
-gui_lift_active = False     # True when Lift button pressed
-gui_resume_request = False # Return to normal standing
 gui_enabled = False
 
 # LIFT parameters
@@ -457,7 +505,7 @@ monitor_state = {
 # FINAL UNIFIED MESSY DARK CONTROL + DIAGNOSTICS GUI
 # ==================================================
 def start_unified_gui():
-    global gui_selected_leg, gui_lift_active, gui_resume_request
+    global gui_selected_leg
 
     root = tk.Tk()
     root.title("QUADRUPED // CONTROL // DIAGNOSTICS")
@@ -510,8 +558,12 @@ def start_unified_gui():
 
     def select_leg(leg):
         global gui_selected_leg
-        gui_selected_leg = leg
-        selected_leg_var.set(leg)
+        accepted = request_step(leg)
+        if accepted:
+            gui_selected_leg = leg
+            selected_leg_var.set(leg)
+        else:
+            selected_leg_var.set("BUSY")
 
     for leg in ["FRF", "FLF", "RRF", "RLF"]:
         tk.Button(
@@ -528,20 +580,60 @@ def start_unified_gui():
     tk.Label(left, textvariable=selected_leg_var, font=FONT_MONO, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10)
 
     def lift():
-        global gui_lift_active
-        gui_lift_active = True
-
+        pass
+        
     def lower():
-        global gui_lift_active
-        gui_lift_active = False
-
-    def resume():
-        global gui_resume_request
-        gui_resume_request = True
+        pass
 
     tk.Button(left, text="LIFT", command=lift, bg="#333333", fg="#ffffff", relief="flat", font=FONT_HDR).pack(fill="x", padx=10, pady=(12, 4))
     tk.Button(left, text="LOWER", command=lower, bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=4)
-    tk.Button(left, text="RESUME STANDING", command=resume, bg="#1b1b1b", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=(8, 8))
+    
+    def start_gait():
+        global gait_enabled
+        gait_enabled = True
+
+    def stop_gait():
+        global gait_enabled, step_active, swing_leg, fsm_state, disable_roll_pd
+
+        gait_enabled = False
+
+        # Hard cancel any active step
+        step_active = False
+        swing_leg = None
+
+        # Clear posture intent
+        posture_roll_target = 0.0
+        posture_pitch_target = 0.0
+
+        # Clear motion offsets
+        for k in motion_offsets:
+            motion_offsets[k] = 0.0
+
+        # Restore balance controller
+        disable_roll_pd = False
+
+        # Force clean recovery
+        fsm_state = "RECENTERING"
+
+    tk.Button(
+        left,
+        text="START CRAWL GAIT",
+        command=start_gait,
+        bg="#1e1e1e",
+        fg="#ffffff",
+        relief="flat",
+        font=FONT_HDR
+    ).pack(fill="x", padx=10, pady=(10, 4))
+
+    tk.Button(
+        left,
+        text="STOP GAIT",
+        command=stop_gait,
+        bg="#141414",
+        fg="#cccccc",
+        relief="flat",
+        font=FONT_MAIN
+    ).pack(fill="x", padx=10, pady=4)
 
     # -------- Raw debug dump --------
     raw_state = tk.StringVar()
@@ -648,7 +740,6 @@ def start_unified_gui():
         raw_state.set(
             f"fsm={fsm_state}\n"
             f"swing_leg={swing_leg}\n"
-            f"lift_active={gui_lift_active}\n"
             f"roll_effort={monitor_state['roll_effort']:.3f}\n"
             f"offset_change={monitor_state['offset_change']:.3f}"
         )
@@ -826,70 +917,13 @@ while True:
         monitor_state["az"] = az
 
         # ==================================================
-        # APPLY GUI RESUME REQUEST
-        # ==================================================
-        if gui_resume_request:
-            # Cancel any active step
-            swing_leg = None
-            gui_selected_leg = None
-            gui_lift_active = False
-            step_active = False
-
-            # Clear posture targets
-            posture_roll_target = 0.0
-            posture_pitch_target = 0.0
-
-            # Clear all motion offsets (shoulders + feet)
-            for k in motion_offsets:
-                motion_offsets[k] = 0.0
-
-            # IMPORTANT: force foot contact recovery
-            for leg in FEET:
-                foot_contact[leg] = 1.0
-
-            # Restore balance controller
-            disable_roll_pd = False
-
-            # Go through recentering so biases settle cleanly
-            fsm_state = "RECENTERING"
-
-            gui_resume_request = False
-
-        # ==================================================
         # LAYER-2 FSM: UNLOAD → LIFT
         # ==================================================
         
         # ==================================================
-        # GUI LIFT TRIGGER
-        # ==================================================
-        # If user presses Lift while unloading, enter LIFTING
-        if gui_enabled and fsm_state == "UNLOADING" and gui_lift_active:
-            fsm_state = "LIFTING"
-        # ==================================================
         # APPLY GUI INTENT (SAFE, NON-BLOCKING)
         # ==================================================
-
-        # Resume to normal standing
-        if gui_enabled and gui_resume_request:
-            swing_leg = None
-            gui_selected_leg = None
-            gui_lift_active = False
-
-            posture_roll_target = 0.0
-            posture_pitch_target = 0.0
-
-            for k in motion_offsets:
-                motion_offsets[k] = 0.0
-
-            disable_roll_pd = False
-            fsm_state = "IDLE"
-            gui_resume_request = False
-
-
-        # Request unloading of a leg (only when GUI is enabled)
-        if gui_enabled and gui_selected_leg is not None and fsm_state == "IDLE":
-            swing_leg = gui_selected_leg
-            
+           
         if fsm_state == "IDLE":
             if swing_leg is not None:
                 step_active = True
@@ -903,14 +937,9 @@ while True:
                 fsm_state = "UNLOADING"
 
         elif fsm_state == "UNLOADING":
-            # ==================================================
-            # AUTHORITATIVE SHOULDER UNLOADING (NO PD FIGHT)
-            # ==================================================
+            # Authoritative geometric unload
             for shoulder in SHOULDERS:
-                # Body-space unload command (positive = outward, negative = inward)
                 body_target = UNLOAD_SHOULDER_OFFSETS[swing_leg].get(shoulder, 0.0)
-
-                # Convert body-space direction → servo-space direction
                 servo_target = SHOULDER_SIGN[shoulder] * body_target
 
                 motion_offsets[shoulder] = ramp(
@@ -918,22 +947,13 @@ while True:
                     servo_target,
                     0.8
                 )
-            # -------- UNLOADED DETECTION (READ-ONLY) --------
-            UNLOADED = (
-                abs(roll  - posture_roll_bias)  < UNLOAD_SETTLE_THRESH and
-                abs(pitch - posture_pitch_bias) < UNLOAD_SETTLE_THRESH and
-                roll_effort < 0.15 and
-                offset_change < 0.05
-            )
-            monitor_state["unloaded"] = bool(UNLOADED)
-            if UNLOADED and (time.time() - unload_start) > 0.5:
+
+            # TIME-GATED EXIT (AUTHORITATIVE)
+            if (time.time() - unload_start) >= 0.6:
                 fsm_state = "LIFTING"
-
+            
         elif fsm_state == "LIFTING":
-            # BODY-space lift command
-            body_lift = LIFT_HEIGHT if gui_lift_active else 0.0
-
-            # Convert BODY-space → SERVO-space using FOOT_SIGN
+            body_lift = LIFT_HEIGHT
             servo_lift = FOOT_SIGN[swing_leg] * body_lift
 
             motion_offsets[swing_leg] = ramp(
@@ -942,18 +962,13 @@ while True:
                 LIFT_STEP
             )
 
-            # If fully lifted, enter DONE (only when lifting)
-            if gui_lift_active and abs(motion_offsets[swing_leg] - servo_lift) < 0.3:
+            if abs(motion_offsets[swing_leg] - servo_lift) < 0.3:
                 fsm_state = "DONE"
                 
         elif fsm_state == "DONE":
-            # If user lowers foot, begin recentering
-            if not gui_lift_active:
-                # IMPORTANT: neutralize posture targets so recentering can finish
-                posture_roll_target = 0.0
-                posture_pitch_target = 0.0
-
-                fsm_state = "RECENTERING"
+            posture_roll_target = 0.0
+            posture_pitch_target = 0.0
+            fsm_state = "RECENTERING"
                 
         elif fsm_state == "RECENTERING":
             # Gradually remove posture bias
@@ -991,7 +1006,6 @@ while True:
         if (
             step_active
             and swing_leg is not None
-            and not gui_lift_active
             and foot_contact[swing_leg] > 0.75
             and fsm_state in ("DONE", "RECENTERING")
         ):
@@ -1141,7 +1155,6 @@ while True:
             if fsm_state in ("LIFTING", "DONE"):
                 if (
                     leg == swing_leg and
-                    gui_lift_active and
                     abs(motion_offsets[leg]) > 0.5
                 ):
                     foot_contact[leg] = max(0.0, foot_contact[leg] - CONTACT_FALL)
@@ -1151,7 +1164,11 @@ while True:
 
         monitor_state["foot_contact"] = dict(foot_contact)
         monitor_state["leg_motion_response"] = dict(leg_motion_response)
-                      
+        
+        # ==================================================
+        # GAIT SEQUENCER TICK
+        # ==================================================
+        gait_tick()              
         time.sleep(DT)
 
     except IOError:

@@ -1,9 +1,3 @@
-# Copyright (c) 2025 Aryaman Gupta
-# All Rights Reserved.
-#
-# This code is proprietary.
-# Unauthorized use, modification, or distribution is prohibited.
-
 import time, math, errno
 from smbus2 import SMBus
 import threading 
@@ -160,7 +154,41 @@ roll_effort = 0.0
 DEBUG_PRINT = False
 PRINT_INTERVAL = 2.0 # seconds
 last_print = time.time()
+last_contact_print = 0.0
+CONTACT_PRINT_DT = 0.3
+last_printed_contact = 1.0
+CONTACT_PRINT_EPS = 0.08   # print only on meaningful change
 
+# ==================================================
+# STEP PRIMITIVE (SEALED)
+# A STEP consists of:
+# UNLOADING → LIFTING → DONE → RECENTERING → CONTACT → IDLE
+# Once contact is detected, the step is considered COMPLETE.
+# No external code should interfere mid-step.
+# ==================================================
+step_active = False
+
+# ==================================================
+# DATA LOGGER (NON-BLOCKING)
+# ==================================================
+LOG_ENABLE = True
+LOG_DT = 0.05           # log at control rate (20 Hz)
+LOG_FILE = "run_log.csv"
+last_log_time = 0.0
+
+SERVO_DELTA_GROUND = 0.15   # deg → constrained
+SERVO_DELTA_AIR    = 0.6    # deg → free
+
+if LOG_ENABLE:
+    log_f = open(LOG_FILE, "w")
+    log_f.write(
+        "t,roll,pitch,"
+        "posture_roll,posture_pitch,"
+        "roll_effort,offset_change,"
+        "fsm,swing,brace\n"
+    )
+    log_f.flush()
+    
 # ==================================================
 # LOW-LEVEL HARDWARE FUNCTIONS (DO NOT TWEAK)
 # ==================================================
@@ -292,9 +320,16 @@ POSTURE_MAX_ROLL   = 8.0    # deg - max intentional lean
 POSTURE_MAX_PITCH  = 6.0
 POSTURE_STEP       = 0.3    # deg per loop - smoothness
 
+
 # Motion offsets per-joint (added on top of balance offsets)
 motion_offsets = {k: 0.0 for k in SHOULDERS}
 motion_offsets.update({k: 0.0 for k in FEET})
+
+# ==================================================
+# RECENTERING PARAMETERS
+# ==================================================
+RECENTER_STEP = 0.5        # deg per loop (how fast offsets fade out)
+RECENTER_THRESH = 0.5      # deg — considered "neutral"
 
 # Simple ramp helper
 def ramp(current, target, step):
@@ -347,7 +382,7 @@ UNLOAD_SHOULDER_OFFSETS = {
 }
 
 # FSM for simple unload + lift of a single leg (start disabled)
-swing_leg = "FLF"        # e.g. "FRF" when commanded
+swing_leg = None        # e.g. "FRF" when commanded
 fsm_state = "IDLE"      # IDLE / UNLOADING / LIFTING / DONE
 disable_roll_pd = False
 
@@ -357,9 +392,10 @@ disable_roll_pd = False
 gui_selected_leg = None      # "FRF", "FLF", "RRF", "RLF"
 gui_lift_active = False     # True when Lift button pressed
 gui_resume_request = False # Return to normal standing
+gui_enabled = False
 
 # LIFT parameters
-LIFT_HEIGHT = 12.0      # deg (knee flex offset as motion)
+LIFT_HEIGHT = 15.0      # deg (knee flex offset as motion)
 LIFT_STEP = 0.8         # deg per cycle for knee motion
 UNLOAD_SETTLE_THRESH = 1.0  # deg — how close IMU must be to posture bias
 
@@ -399,139 +435,91 @@ monitor_state = {
     "roll_effort": 0.0,
     "offset_change": 0.0,
     "unloaded": False,
+    
+    #foot contact confidence 0 to 1
+    "foot_contact": {},
+    "leg_motion_response": {},
+    
+    # STEP diagnostics
+    "step_phase": "IDLE",
+    "step_active": False,
+    "last_step_ok": True
+    
 }
 
-
-# store last commanded servo angles
-
-
-for leg, ch in SHOULDERS.items():
-    servo_angles[ch] = SHOULDER_STAND[leg]
-
-for leg, ch in FEET.items():
-    servo_angles[ch] = FOOT_STAND[leg]
-
 # ==================================================
-# READ-ONLY MONITOR GUI
+# FINAL UNIFIED MESSY DARK CONTROL + DIAGNOSTICS GUI
 # ==================================================
-def start_monitor_gui():
-    root = tk.Tk()
-    root.title("Quadruped Layer-1 Monitor")
-
-    # IMU labels
-    imu_frame = tk.LabelFrame(root, text="IMU")
-    imu_frame.pack(padx=10, pady=5, fill="x")
-    # Acceleration labels (raw)
-    accel_frame = tk.LabelFrame(root, text="Acceleration (raw)")
-    accel_frame.pack(padx=10, pady=5, fill="x")
-
-    ax_var = tk.StringVar()
-    ay_var = tk.StringVar()
-    az_var = tk.StringVar()
-    
-    # ADD — new GUI vars for unload debug
-    roll_effort_var = tk.StringVar()
-    offset_change_var = tk.StringVar()
-    unloaded_var = tk.StringVar()
-    
-    roll_var = tk.StringVar()
-    pitch_var = tk.StringVar()
-    brace_var = tk.StringVar()
-    brace_roll_var = tk.StringVar()
-    brace_pitch_var = tk.StringVar()
-    tk.Label(imu_frame, textvariable=roll_var, font=("Arial", 12)).pack(anchor="w")
-    tk.Label(imu_frame, textvariable=pitch_var, font=("Arial", 12)).pack(anchor="w")
-    tk.Label(imu_frame, textvariable=brace_var, font=("Arial", 12)).pack(anchor="w")
-    tk.Label(imu_frame, textvariable=brace_roll_var, font=("Arial", 12)).pack(anchor="w")
-    tk.Label(imu_frame, textvariable=brace_pitch_var, font=("Arial", 12)).pack(anchor="w")
-    tk.Label(accel_frame, textvariable=ax_var, font=("Arial", 10)).pack(anchor="w")
-    tk.Label(accel_frame, textvariable=ay_var, font=("Arial", 10)).pack(anchor="w")
-    tk.Label(accel_frame, textvariable=az_var, font=("Arial", 10)).pack(anchor="w")
-    
-    # Place them under the accel_frame (or imu_frame) so they're visible
-    tk.Label(imu_frame, textvariable=roll_effort_var, font=("Arial", 10)).pack(anchor="w")
-    tk.Label(imu_frame, textvariable=offset_change_var, font=("Arial", 10)).pack(anchor="w")
-    tk.Label(imu_frame, textvariable=unloaded_var, font=("Arial", 10)).pack(anchor="w")
-
-    # Servo labels
-    servo_frame = tk.LabelFrame(root, text="Servo Angles (deg)")
-    servo_frame.pack(padx=10, pady=5)
-
-    servo_vars = {}
-
-    for ch in sorted(servo_angles.keys()):
-        var = tk.StringVar()
-        servo_vars[ch] = var
-        tk.Label(
-            servo_frame,
-            textvariable=var,
-            font=("Arial", 10),
-            width=22,
-            anchor="w"
-        ).pack(anchor="w")
-
-    def update():
-        roll_var.set(f"Roll  : {monitor_state['roll']:+6.2f}°")
-        pitch_var.set(f"Pitch : {monitor_state['pitch']:+6.2f}°")
-        brace_var.set("Brace : ACTIVE" if monitor_state["brace"] else "Brace : off")
-        brace_roll_var.set(f"Brace Roll Bias  : {monitor_state['brace_roll_bias']:+6.2f}°")
-        brace_pitch_var.set(f"Brace Pitch Bias : {monitor_state['brace_pitch_bias']:+6.2f}°")
-        
-        # ADD — update debug vars from shared monitor_state
-        roll_effort_var.set(f"Roll Effort   : {monitor_state.get('roll_effort', 0.0):.3f}")
-        offset_change_var.set(f"Offset Change : {monitor_state.get('offset_change', 0.0):.3f}")
-        unloaded_var.set(f"UNLOADED      : {monitor_state.get('unloaded', False)}")
-        
-        ax_var.set(f"AX : {monitor_state['ax']:6.0f}")
-        ay_var.set(f"AY : {monitor_state['ay']:6.0f}")
-        az_var.set(f"AZ : {monitor_state['az']:6.0f}")
-
-        for ch, var in servo_vars.items():
-            var.set(f"CH {ch:2d} → {servo_angles[ch]:6.2f}°")
-
-        root.after(100, update)  # 10 Hz GUI refresh
-
-    update()
-    root.mainloop()
-    
-threading.Thread(
-    target=start_monitor_gui,
-    daemon=True
-).start()   
-
-# ==================================================
-# COMMAND GUI — UNLOAD / LIFT / RESUME
-# ==================================================
-def start_command_gui():
+def start_unified_gui():
     global gui_selected_leg, gui_lift_active, gui_resume_request
 
     root = tk.Tk()
-    root.title("Quadruped Unload / Lift Control")
-    root.geometry("360x360")
+    root.title("QUADRUPED // CONTROL // DIAGNOSTICS")
+    root.geometry("1100x680")
+    root.configure(bg="#0b0b0b")
 
-    # ---------------------------
-    # UNLOAD CONTROLS
-    # ---------------------------
-    frame_unload = tk.LabelFrame(root, text="Unload Leg")
-    frame_unload.pack(fill="x", padx=10, pady=5)
+    # ---------------- Fonts ----------------
+    FONT_BIG  = ("Segoe UI Semibold", 20)
+    FONT_HDR  = ("Segoe UI Semibold", 12)
+    FONT_MAIN = ("Segoe UI", 10)
+    FONT_MONO = ("Consolas", 9)
 
-    def unload(leg):
+    # ---------------- Header ----------------
+    header = tk.Frame(root, bg="#111111")
+    header.pack(fill="x")
+
+    tk.Label(
+        header,
+        text="QUADRUPED // CONTROL // DIAGNOSTICS",
+        font=FONT_BIG,
+        fg="#ffffff",
+        bg="#111111",
+        pady=4
+    ).pack(anchor="w", padx=12)
+
+    tk.Label(
+        header,
+        text="balance • posture FSM • foot contact • reflex layer • diagnostics",
+        font=FONT_MONO,
+        fg="#9a9a9a",
+        bg="#111111"
+    ).pack(anchor="w", padx=14, pady=(0, 6))
+
+    # ---------------- Layout ----------------
+    main = tk.Frame(root, bg="#0b0b0b")
+    main.pack(fill="both", expand=True, padx=8, pady=8)
+
+    left  = tk.Frame(main, bg="#151515", width=300)
+    right = tk.Frame(main, bg="#151515")
+
+    left.pack(side="left", fill="y", padx=(0, 8))
+    right.pack(side="right", fill="both", expand=True)
+
+    # ==================================================
+    # LEFT PANEL — CONTROLS + RAW STATE
+    # ==================================================
+    tk.Label(left, text="CONTROLS", font=FONT_HDR, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(8, 4))
+
+    selected_leg_var = tk.StringVar(value="None")
+
+    def select_leg(leg):
         global gui_selected_leg
         gui_selected_leg = leg
+        selected_leg_var.set(leg)
 
     for leg in ["FRF", "FLF", "RRF", "RLF"]:
         tk.Button(
-            frame_unload,
-            text=f"Unload {leg}",
-            width=10,
-            command=lambda l=leg: unload(l)
-        ).pack(side="left", padx=4, pady=4)
+            left,
+            text=f"SELECT {leg}",
+            command=lambda l=leg: select_leg(l),
+            bg="#222222",
+            fg="#e6e6e6",
+            relief="flat",
+            font=FONT_MAIN
+        ).pack(fill="x", padx=10, pady=2)
 
-    # ---------------------------
-    # LIFT CONTROLS
-    # ---------------------------
-    frame_lift = tk.LabelFrame(root, text="Lift / Lower")
-    frame_lift.pack(fill="x", padx=10, pady=5)
+    tk.Label(left, text="ACTIVE LEG:", font=FONT_MONO, fg="#9a9a9a", bg="#151515").pack(anchor="w", padx=10, pady=(6, 0))
+    tk.Label(left, textvariable=selected_leg_var, font=FONT_MONO, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10)
 
     def lift():
         global gui_lift_active
@@ -541,31 +529,197 @@ def start_command_gui():
         global gui_lift_active
         gui_lift_active = False
 
-    tk.Button(frame_lift, text="Lift (+5°)", width=15, command=lift).pack(pady=4)
-    tk.Button(frame_lift, text="Lower", width=15, command=lower).pack(pady=4)
-
-    # ---------------------------
-    # RESUME
-    # ---------------------------
     def resume():
         global gui_resume_request
         gui_resume_request = True
 
-    tk.Button(
-        root,
-        text="Resume Normal Standing",
-        width=28,
-        command=resume
-    ).pack(pady=12)
+    tk.Button(left, text="LIFT", command=lift, bg="#333333", fg="#ffffff", relief="flat", font=FONT_HDR).pack(fill="x", padx=10, pady=(12, 4))
+    tk.Button(left, text="LOWER", command=lower, bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=4)
+    tk.Button(left, text="RESUME STANDING", command=resume, bg="#1b1b1b", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=(8, 8))
 
+    # -------- Raw debug dump --------
+    raw_state = tk.StringVar()
+    tk.Label(
+        left,
+        textvariable=raw_state,
+        font=FONT_MONO,
+        fg="#9a9a9a",
+        bg="#151515",
+        justify="left"
+    ).pack(anchor="w", padx=10, pady=6)
+
+    # ==================================================
+    # RIGHT PANEL — DIAGNOSTICS
+    # ==================================================
+    tk.Label(right, text="DIAGNOSTICS", font=FONT_HDR, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(8, 4))
+
+    imu_var   = tk.StringVar()
+    fsm_var   = tk.StringVar()
+    brace_var = tk.StringVar()
+    step_phase_var = tk.StringVar()
+    step_active_var = tk.StringVar()
+    step_ok_var = tk.StringVar()
+
+    tk.Label(right, textvariable=imu_var, font=FONT_MONO, fg="#e6e6e6", bg="#151515", justify="left").pack(anchor="w", padx=10)
+    tk.Label(right, textvariable=fsm_var, font=FONT_HDR, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=4)
+    tk.Label(right, textvariable=brace_var, font=FONT_MONO, fg="#9a9a9a", bg="#151515").pack(anchor="w", padx=10)
+    tk.Label(
+    right,
+    textvariable=step_phase_var,
+    font=FONT_HDR,
+    fg="#ffffff",
+    bg="#151515").pack(anchor="w", padx=10, pady=(6, 0))
+
+    tk.Label(
+        right,
+        textvariable=step_active_var,
+        font=FONT_MONO,
+        fg="#9a9a9a",
+        bg="#151515").pack(anchor="w", padx=10)
+
+    tk.Label(
+        right,
+        textvariable=step_ok_var,
+        font=FONT_MONO,
+        fg="#9a9a9a",
+        bg="#151515").pack(anchor="w", padx=10, pady=(0, 6))
+
+    # ---------------- Foot Contact ----------------
+    tk.Label(right, text="FOOT CONTACT", font=FONT_HDR, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(10, 4))
+
+    contact_frame = tk.Frame(right, bg="#151515")
+    contact_frame.pack(fill="x", padx=10)
+
+    contact_bars = {}
+    last_contact = {k: 1.0 for k in ["FRF","FLF","RRF","RLF"]}
+
+    for leg in ["FRF", "FLF", "RRF", "RLF"]:
+        row = tk.Frame(contact_frame, bg="#151515")
+        row.pack(fill="x", pady=2)
+
+        tk.Label(row, text=leg, width=4, font=FONT_MONO, fg="#ffffff", bg="#151515").pack(side="left")
+
+        bar_bg = tk.Frame(row, bg="#222222", height=12)
+        bar_bg.pack(side="left", fill="x", expand=True, padx=6)
+
+        bar_fg = tk.Frame(bar_bg, bg="#e6e6e6", width=0)
+        bar_fg.pack(side="left", fill="y")
+
+        val_lbl = tk.Label(row, text="0.00", width=5, font=FONT_MONO, fg="#9a9a9a", bg="#151515")
+        val_lbl.pack(side="right")
+
+        contact_bars[leg] = (bar_fg, val_lbl)
+
+    # ---------------- Footer / Timeline ----------------
+    status_var = tk.StringVar()
+    tk.Label(
+        root,
+        textvariable=status_var,
+        font=FONT_MONO,
+        fg="#e6e6e6",
+        bg="#0b0b0b",
+        anchor="w"
+    ).pack(fill="x", padx=10, pady=4)
+
+    # ---------------- Update Loop ----------------
+    def update():
+        imu_var.set(
+            f"ROLL  {monitor_state['roll']:+6.2f} deg\n"
+            f"PITCH {monitor_state['pitch']:+6.2f} deg\n"
+            f"AX {monitor_state['ax']:6.0f}  AY {monitor_state['ay']:6.0f}  AZ {monitor_state['az']:6.0f}"
+        )
+
+        fsm_var.set(f"FSM STATE : {fsm_state}")
+        brace_var.set("BRACE : ACTIVE" if monitor_state["brace"] else "BRACE : off")
+        step_phase_var.set(f"STEP PHASE : {monitor_state['step_phase']}")
+        step_active_var.set(f"STEP ACTIVE : {monitor_state['step_active']}")
+        step_ok_var.set(
+            "LAST STEP : OK"
+            if monitor_state["last_step_ok"]
+            else "LAST STEP : WARN"
+        )
+
+        raw_state.set(
+            f"fsm={fsm_state}\n"
+            f"swing_leg={swing_leg}\n"
+            f"lift_active={gui_lift_active}\n"
+            f"roll_effort={monitor_state['roll_effort']:.3f}\n"
+            f"offset_change={monitor_state['offset_change']:.3f}"
+        )
+
+        for leg, (bar, lbl) in contact_bars.items():
+            c = monitor_state["foot_contact"].get(leg, 0.0)
+            bar.config(width=int(240 * c))
+            lbl.config(text=f"{c:.2f}")
+
+            # flash on touchdown
+            if c > 0.8 and last_contact[leg] < 0.3:
+                bar.config(bg="#ffffff")
+            else:
+                bar.config(bg="#e6e6e6")
+
+            last_contact[leg] = c
+
+        status_var.set(
+            f"{fsm_state} | swing={swing_leg} | "
+            f"FRF={monitor_state['foot_contact'].get('FRF',0):.2f} "
+            f"FLF={monitor_state['foot_contact'].get('FLF',0):.2f} "
+            f"RRF={monitor_state['foot_contact'].get('RRF',0):.2f} "
+            f"RLF={monitor_state['foot_contact'].get('RLF',0):.2f}"
+        )
+
+        root.after(100, update)
+
+    update()
     root.mainloop()
 
 
 threading.Thread(
-    target=start_command_gui,
+    target=start_unified_gui,
     daemon=True
 ).start()
- 
+
+gui_enabled = True
+
+# store last commanded servo angles
+# DEBUG: last servo angles for contact testing
+last_servo_angles = {}
+for ch in FEET.values():
+    last_servo_angles[ch] = 0.0
+# ==================================================
+# FOOT CONTACT ESTIMATION (READ-ONLY)
+# ==================================================
+# Per-leg motion response (absolute knee delta per cycle)
+leg_motion_response = {k: 0.0 for k in FEET}
+
+# Last knee offsets for response calculation
+last_leg_offsets = {k: 0.0 for k in FEET}
+
+# Per-leg response thresholds
+LEG_RESPONSE_LOW  = 0.06    # deg → constrained (grounded)
+LEG_RESPONSE_HIGH = 0.18    # deg → free (airborne)
+
+# Per-foot contact confidence: 0.0 (air) → 1.0 (ground)
+foot_contact = {k: 1.0 for k in FEET}
+
+# Previous motion offsets (for delta detection)
+last_motion_offsets = {k: 0.0 for k in FEET}
+
+# Tunable thresholds (SAFE DEFAULTS)
+CONTACT_EFFORT_HIGH = 0.12     # roll_effort above this → resistance
+CONTACT_OFFSET_LOW  = 0.06     # offset_change below this → constrained
+CONTACT_MOTION_MIN  = 1.0      # deg — ignore noise-level motion
+
+CONTACT_RISE = 0.25           # confidence rise rate
+CONTACT_FALL = 0.06            # confidence fall rate
+
+for leg, ch in SHOULDERS.items():
+    servo_angles[ch] = SHOULDER_STAND[leg]
+
+for leg, ch in FEET.items():
+    servo_angles[ch] = FOOT_STAND[leg]
+
+
 # ==================================================
 # MAIN CONTROL LOOP — LAYER 1 REFLEX
 # ==================================================
@@ -587,7 +741,20 @@ while True:
         delta_a = math.sqrt(dax*dax + day*day + daz*daz)
 
         now = time.time()
-
+        
+        # ==================================================
+        # LOG DATA (NON-BLOCKING)
+        # ==================================================
+        if LOG_ENABLE and (now - last_log_time) >= LOG_DT:
+            log_f.write(
+                f"{now:.3f},"
+                f"{roll:.3f},{pitch:.3f},"
+                f"{posture_roll_bias:.3f},{posture_pitch_bias:.3f},"
+                f"{roll_effort:.3f},{offset_change:.3f},"
+                f"{fsm_state},{swing_leg},{int(brace_active)}\n"
+            )
+            last_log_time = now
+    
         if (delta_a > BRACE_ACCEL_THRESHOLD) and not brace_active:
             brace_active = True
             brace_until = now + BRACE_DURATION
@@ -645,36 +812,40 @@ while True:
         monitor_state["brace"] = brace_active
         monitor_state["brace_roll_bias"] = brace_roll_bias
         monitor_state["brace_pitch_bias"] = brace_pitch_bias
+        monitor_state["fsm_state"] = fsm_state
+        monitor_state["step_active"] = step_active
+        monitor_state["step_phase"] = fsm_state
         monitor_state["ax"] = ax
         monitor_state["ay"] = ay
         monitor_state["az"] = az
-
-        if DEBUG_PRINT and (time.time() - last_print) > PRINT_INTERVAL:
-            print(f"Roll:{roll:6.2f}°  Pitch:{pitch:6.2f}°")
-            last_print = time.time()
 
         # ==================================================
         # APPLY GUI RESUME REQUEST
         # ==================================================
         if gui_resume_request:
-            # cancel unloading & lifting
+            # Cancel any active step
             swing_leg = None
             gui_selected_leg = None
             gui_lift_active = False
+            step_active = False
 
-            # clear posture targets
+            # Clear posture targets
             posture_roll_target = 0.0
             posture_pitch_target = 0.0
 
-            # clear all motion offsets (shoulders + knees)
+            # Clear all motion offsets (shoulders + feet)
             for k in motion_offsets:
                 motion_offsets[k] = 0.0
 
-            # re-enable balance controller
+            # IMPORTANT: force foot contact recovery
+            for leg in FEET:
+                foot_contact[leg] = 1.0
+
+            # Restore balance controller
             disable_roll_pd = False
 
-            # reset FSM
-            fsm_state = "IDLE"
+            # Go through recentering so biases settle cleanly
+            fsm_state = "RECENTERING"
 
             gui_resume_request = False
 
@@ -686,14 +857,14 @@ while True:
         # GUI LIFT TRIGGER
         # ==================================================
         # If user presses Lift while unloading, enter LIFTING
-        if fsm_state == "UNLOADING" and gui_lift_active:
+        if gui_enabled and fsm_state == "UNLOADING" and gui_lift_active:
             fsm_state = "LIFTING"
         # ==================================================
         # APPLY GUI INTENT (SAFE, NON-BLOCKING)
         # ==================================================
 
         # Resume to normal standing
-        if gui_resume_request:
+        if gui_enabled and gui_resume_request:
             swing_leg = None
             gui_selected_leg = None
             gui_lift_active = False
@@ -709,12 +880,13 @@ while True:
             gui_resume_request = False
 
 
-        # Request unloading of a leg
-        if gui_selected_leg is not None and fsm_state == "IDLE":
+        # Request unloading of a leg (only when GUI is enabled)
+        if gui_enabled and gui_selected_leg is not None and fsm_state == "IDLE":
             swing_leg = gui_selected_leg
             
         if fsm_state == "IDLE":
             if swing_leg is not None:
+                step_active = True
                 posture_roll_target  = UNLOAD_POSTURE[swing_leg]["roll"]
                 posture_pitch_target = UNLOAD_POSTURE[swing_leg]["pitch"]
                 unload_start = time.time()
@@ -769,10 +941,95 @@ while True:
                 fsm_state = "DONE"
                 
         elif fsm_state == "DONE":
-            # Hold leg up unless user lowers it
+            # If user lowers foot, begin recentering
             if not gui_lift_active:
-                fsm_state = "LIFTING"
+                # IMPORTANT: neutralize posture targets so recentering can finish
+                posture_roll_target = 0.0
+                posture_pitch_target = 0.0
 
+                fsm_state = "RECENTERING"
+                
+        elif fsm_state == "RECENTERING":
+            # Gradually remove posture bias
+            posture_roll_bias = ramp(posture_roll_bias, 0.0, POSTURE_STEP)
+            posture_pitch_bias = ramp(posture_pitch_bias, 0.0, POSTURE_STEP)
+
+            # Gradually remove all motion offsets (shoulders + feet)
+            for k in motion_offsets:
+                motion_offsets[k] = ramp(
+                    motion_offsets[k],
+                    0.0,
+                    RECENTER_STEP
+                )
+            # Check if everything is near neutral
+            all_centered = (
+                abs(posture_roll_bias) < RECENTER_THRESH and
+                abs(posture_pitch_bias) < RECENTER_THRESH and
+                all(abs(motion_offsets[k]) < RECENTER_THRESH for k in motion_offsets)
+            )
+            if all_centered:
+                # Reset roll offsets so PD resumes from neutral
+                for k in roll_offsets:
+                    roll_offsets[k] = 0.0
+
+                # Re-enable roll PD cleanly
+                disable_roll_pd = False
+
+                swing_leg = None
+                gui_selected_leg = None
+                fsm_state = "IDLE"    
+                    
+        # ==================================================
+        # STEP COMPLETION — CONTACT-GATED (FINAL)
+        # ==================================================
+        if (
+            step_active
+            and swing_leg is not None
+            and not gui_lift_active
+            and foot_contact[swing_leg] > 0.75
+            and fsm_state in ("DONE", "RECENTERING")
+        ):
+            completed_leg = swing_leg
+            # Clear posture intent
+            posture_roll_target  = 0.0
+            posture_pitch_target = 0.0
+
+            # Clear motion offsets
+            for k in motion_offsets:
+                motion_offsets[k] = 0.0
+
+            # Reset roll offsets cleanly
+            for k in roll_offsets:
+                roll_offsets[k] = 0.0
+
+            # Restore balance controller
+            disable_roll_pd = False
+
+            # Clear step state
+            swing_leg = None
+            gui_selected_leg = None
+            step_active = False
+            
+
+            # FSM returns to neutral
+            monitor_state["last_step_ok"] = (foot_contact[completed_leg] > 0.75)
+            fsm_state = "IDLE"
+            
+        # ==================================================
+        # STEP INVARIANT CHECK (DEBUG / SAFE)
+        # ==================================================
+        if fsm_state == "IDLE" and not step_active:
+            # Ownership must be fully released
+            assert swing_leg is None
+            assert disable_roll_pd is False
+
+            # Posture bias must be within absolute safety bounds
+            assert abs(posture_roll_bias) <= POSTURE_MAX_ROLL
+            assert abs(posture_pitch_bias) <= POSTURE_MAX_PITCH
+
+            # Motion offsets must be cleared
+            assert all(abs(motion_offsets[k]) < RECENTER_THRESH for k in motion_offsets)
+       
         # ---------- ROLL REFLEX ----------
         # Shoulders widen/narrow stance to resist tipping
         gain_scale = BRACE_GAIN_SCALE if brace_active else 1.0
@@ -827,8 +1084,7 @@ while True:
 
         # ADD — publish to monitor_state for GUI
         monitor_state["offset_change"] = offset_change
-        
-
+       
 
         # ---------- PITCH REFLEX ----------
         # Knees flex/extend to shift vertical load
@@ -837,8 +1093,11 @@ while True:
             pitch_rate = gy / 131.0     # deg/s
             if abs(pitch_rate) < GYRO_RATE_DEADBAND:
                 pitch_rate = 0.0
-            # USE effective_pitch instead of raw pitch
-            tgt = (gain_scale * (K_PITCH * effective_pitch + K_PITCH_RATE * pitch_rate) + brace_pitch_bias) * (1 if leg.startswith("F") else -1)
+
+            tgt = (
+                gain_scale * (K_PITCH * effective_pitch + K_PITCH_RATE * pitch_rate)
+                + brace_pitch_bias
+            ) * (1 if leg.startswith("F") else -1)
             tgt = max(-PITCH_LIMIT, min(PITCH_LIMIT, tgt))
 
             delta = tgt - pitch_offsets[leg]
@@ -847,19 +1106,51 @@ while True:
                 delta = 0.0
             pitch_offsets[leg] += delta
 
-            # Final foot angle = stand + balance + motion
             angle = (
                 FOOT_STAND[leg]
-                + FOOT_SIGN[leg] * pitch_offsets[leg]   # Layer-1 balance
-                + motion_offsets[leg]                   # Layer-2 motion
+                + FOOT_SIGN[leg] * pitch_offsets[leg]
+                + motion_offsets[leg]
             )
 
             angle = max(FOOT_LIMITS[leg][0], min(FOOT_LIMITS[leg][1], angle))
             set_servo_angle(ch, angle)
             servo_angles[ch] = angle
 
+        # ==================================================
+        # PER-LEG MOTION RESPONSE (POST-PITCH, ONCE PER CYCLE)
+        # ==================================================
+        for leg in FEET:
+            leg_motion_response[leg] = abs(
+                pitch_offsets[leg] - last_leg_offsets[leg]
+            )
+            last_leg_offsets[leg] = pitch_offsets[leg]
+
+        # ==================================================
+        # FOOT CONTACT CONFIDENCE UPDATE (READ-ONLY)
+        # ==================================================
+        for leg in FEET:
+            if abs(motion_offsets[leg]) < CONTACT_MOTION_MIN:
+                continue
+
+            if fsm_state in ("LIFTING", "DONE"):
+                if (
+                    leg == swing_leg and
+                    gui_lift_active and
+                    abs(motion_offsets[leg]) > 0.5
+                ):
+                    foot_contact[leg] = max(0.0, foot_contact[leg] - CONTACT_FALL)
+
+            elif fsm_state in ("RECENTERING", "IDLE"):
+                foot_contact[leg] = min(1.0, foot_contact[leg] + CONTACT_RISE)
+
+        monitor_state["foot_contact"] = dict(foot_contact)
+        monitor_state["leg_motion_response"] = dict(leg_motion_response)
+                      
         time.sleep(DT)
 
     except IOError:
         print("I2C glitch — holding posture")
         time.sleep(0.2)
+        if LOG_ENABLE:
+            log_f.flush()
+        break
