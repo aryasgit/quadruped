@@ -1,3 +1,9 @@
+# Copyright (c) 2025 Aryaman Gupta
+# All Rights Reserved.
+#
+# This code is proprietary.
+# Unauthorized use, modification, or distribution is prohibited.
+
 import time, math, errno
 from smbus2 import SMBus
 import threading 
