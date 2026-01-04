@@ -8,6 +8,17 @@ import time, math, errno
 from smbus2 import SMBus
 import threading 
 import tkinter as tk
+from collections import deque
+import multiprocessing as mp
+from plotter_process import plotter_main
+from telemetry_pub import telemetry_publisher
+
+
+# ==================================================
+# LIVE TELEMETRY IPC (PROCESS-SAFE)
+# ==================================================
+telemetry_q = mp.Queue(maxsize=200)
+
 # ==================================================
 # I2C CONFIG (HARDWARE — DO NOT TWEAK)
 # ==================================================
@@ -198,6 +209,25 @@ PROP_PUSH_STEP = 0.25        # deg per cycle (smooth)
 PROP_CONTACT_MIN = 0.85      # must be firmly grounded
 PROP_SLIP_MAX = 0.25         # disable if slipping
 
+FSM_ID = {
+    "IDLE": 0,
+    "UNLOADING": 1,
+    "LIFTING": 2,
+    "DONE": 3,
+    "RECENTERING": 4,
+    "STOP_HOLD": 5,
+}
+
+POSTURE_ID = {
+    "STAND": 0,
+    "LEAN_LEFT": 1,
+    "LEAN_RIGHT": 2,
+    "LEAN_FWD": 3,
+    "LEAN_BACK": 4,
+    "SIT": 5,
+    "KNEEL": 6,
+}
+
 # ==================================================
 # PUBLIC STEP API (THE ONLY ENTRY POINT)
 # ==================================================
@@ -386,6 +416,26 @@ roll_offsets = {k: 0.0 for k in SHOULDERS}
 pitch_offsets = {k: 0.0 for k in FEET}
 
 print("Layer-1 Roll + Pitch ACTIVE (±30°)\n")
+# ==================================================
+# START LIVE PLOT PROCESS (SEPARATE PROCESS)
+# ==================================================
+from plotter_process import plotter_main
+
+plot_proc = mp.Process(
+    target=plotter_main,
+    args=(telemetry_q,),
+    daemon=True
+)
+plot_proc.start()
+print("[PLOT] plotter process started")
+telem_proc = mp.Process(
+    target=telemetry_publisher,
+    args=(telemetry_q, 5555),
+    daemon=True
+)
+telem_proc.start()
+print("[TELEM] remote telemetry started")
+
 
 # ===============================
 # LAYER-2: POSTURE / MOTION STATE
@@ -538,7 +588,7 @@ def apply_posture_mode():
         posture_pitch_target = -20.0
 
     elif posture_mode == "LEAN_BACK":
-        posture_pitch_target = +30.0
+        posture_pitch_target = +15.0
 
     elif posture_mode == "SIT":
         tgt = POSTURE_TARGETS["SIT"]
@@ -724,6 +774,12 @@ monitor_state = {
     "last_step_ok": True
     
 }
+# ==================================================
+# LIVE TELEMETRY BUFFER (READ-ONLY)
+# ==================================================
+PLOT_WINDOW_SEC = 12.0
+PLOT_HZ = 20
+PLOT_LEN = int(PLOT_WINDOW_SEC * PLOT_HZ)
 
 # ==================================================
 # FINAL UNIFIED MESSY DARK CONTROL + DIAGNOSTICS GUI
@@ -1236,7 +1292,6 @@ for leg, ch in SHOULDERS.items():
 for leg, ch in FEET.items():
     servo_angles[ch] = FOOT_STAND[leg]
 
-
 # ==================================================
 # MAIN CONTROL LOOP — LAYER 1 REFLEX
 # ==================================================
@@ -1369,6 +1424,53 @@ while True:
         monitor_state["ax"] = ax
         monitor_state["ay"] = ay
         monitor_state["az"] = az
+
+        # ---- derived diagnostics ----
+        avg_shoulder = sum(abs(v) for v in roll_offsets.values()) / len(roll_offsets)
+        avg_foot     = sum(abs(v) for v in pitch_offsets.values()) / len(pitch_offsets)
+        avg_mid      = sum(abs(v) for v in mid_offsets.values()) / max(1, len(mid_offsets))
+
+        avg_contact  = sum(foot_contact.values()) / len(foot_contact)
+        avg_slip     = sum(slip_score.values()) / len(slip_score)
+
+        # avg pitch command proxy
+        front_pitch = sum(pitch_offsets[l] for l in FEET if l.startswith("F")) / 2
+        rear_pitch  = sum(pitch_offsets[l] for l in FEET if l.startswith("R")) / 2
+
+        # ---------- TELEMETRY FEED ----------
+        # ---------- TELEMETRY SEND (NON-BLOCKING) ----------
+        if not telemetry_q.full():
+            telemetry_q.put_nowait({
+                "t": time.time(),
+
+                # orientation
+                "roll": monitor_state["roll"],
+                "pitch": monitor_state["pitch"],
+                "effective_roll": effective_roll,
+                "effective_pitch": effective_pitch,
+
+                # posture
+                "posture_roll": posture_roll_bias,
+                "posture_pitch": posture_pitch_bias,
+
+                # control effort
+                "roll_effort": roll_effort,
+                "offset_change": offset_change,
+                "avg_shoulder": avg_shoulder,
+                "avg_foot": avg_foot,
+                "avg_mid": avg_mid,
+
+                # environment
+                "stability": monitor_state["stability"],
+                "foot_contact": avg_contact,
+                "slip": avg_slip,
+
+                # state
+                "brace": 1.0 if brace_active else 0.0,
+                "fsm": FSM_ID.get(fsm_state, -1),
+                "posture": POSTURE_ID.get(posture_mode, -1),
+                "step": 1.0 if step_active else 0.0,
+            })
 
         # ==================================================
         # LAYER-2 FSM: UNLOAD → LIFT
@@ -1603,7 +1705,7 @@ while True:
             tgt = max(-PITCH_LIMIT, min(PITCH_LIMIT, tgt))
 
             if posture_mode == "STAND" and not step_active:
-                tgt = 0.0
+                tgt = max(-15.0, min(15.0, tgt))   # allow gentle pitch balance
             delta = tgt - pitch_offsets[leg]
 
             delta = max(-PITCH_STEP, min(PITCH_STEP, delta))
@@ -1712,7 +1814,7 @@ while True:
                     continue
 
                 prop_target[leg] = +0.6 * PROP_PUSH_DEG
-
+        
         # ==================================================
         # GAIT SEQUENCER TICK
         # ==================================================
