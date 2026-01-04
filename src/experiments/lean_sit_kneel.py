@@ -390,15 +390,82 @@ print("Layer-1 Roll + Pitch ACTIVE (±30°)\n")
 # ===============================
 # LAYER-2: POSTURE / MOTION STATE
 # ===============================
+# ==================================================
+# POSTURE MODES (HIGH-LEVEL INTENT)
+# ==================================================
+posture_mode = "STAND"   # STAND / LEAN_LEFT / LEAN_RIGHT / LEAN_FWD / LEAN_BACK / SIT / KNEEL
+last_posture_change_time = time.time()
+POSTURE_SETTLE_TIME = 0.6   # seconds (tuned to ramp speed)
+
 # Posture biases (targets + current)
 posture_roll_target  = 0.0
 posture_pitch_target = 0.0
 posture_roll_bias   = 0.0   # current applied bias (will ramp to target)
 posture_pitch_bias  = 0.0
+STAND_RECENTER_STEP = 0.8   # slower than RECENTER_STEP
+STAND_RECENTER_IMPULSE = 4.0   # degrees (safe: 3–6)
+STAND_IMPULSE_TIME = 0.4       # seconds
+stand_recenter_until = 0.0
+mid_offsets = {ch: 0.0 for ch in MID_LIMBS}
+MID_RECENTER_STEP = 0.6
 
-POSTURE_MAX_ROLL   = 8.0    # deg - max intentional lean
-POSTURE_MAX_PITCH  = 6.0
-POSTURE_STEP       = 0.3    # deg per loop - smoothness
+
+# ==================================================
+# POSTURE CALIBRATED TARGETS (MEASURED FROM ROBOT)
+# ==================================================
+POSTURE_TARGETS = {
+
+    # ✅ TRUE SIT (measured absolute posture)
+    "SIT": {
+            "posture_pitch": 0.0,   # IMPORTANT: no pitch bias
+            "feet": {
+                "FRF": +27.0,
+                "FLF": -27.0,
+                "RRF":  0.0,
+                "RLF":  0.0,
+            }
+        },
+    # ✅ KNEEL (reuse old SIT behaviour)
+    "KNEEL": {
+        "posture_pitch": +2.0,
+        "feet": {
+            "FRF":  0.0,
+            "FLF": +4.0,
+            "RRF": +25.0,
+            "RLF": +36.0,
+        }
+    }
+}
+POSTURE_TARGETS["KNEEL"] = {
+    "posture_pitch": 0.0,   # no body pitch bias
+
+    # Shoulder offsets (relative to STAND)
+    "shoulders": {
+        "FR": -15.0,
+        "FL": +16.0,
+        "RR": +10.0,
+        "RL": -11.0,
+    },
+
+    # Feet offsets (relative to STAND)
+    "feet": {
+        "FRF": 0.0,
+        "FLF": 0.0,
+        "RRF": 0.0,
+        "RLF": 0.0,
+    }
+}
+POSTURE_TARGETS["KNEEL"]["midlimbs"] = {
+    8: +19.0,   # FRM
+    9: -21.0,   # FLM
+    2:  0.0,    # RRM
+    3:  0.0,    # RLM
+}
+
+
+POSTURE_MAX_ROLL   = 20.0    # deg - max intentional lean
+POSTURE_MAX_PITCH  = 20.0
+POSTURE_STEP       = 0.4    # deg per loop - smoothness
 
 
 # Motion offsets per-joint (added on top of balance offsets)
@@ -417,6 +484,79 @@ def ramp(current, target, step):
     if d > step: d = step
     if d < -step: d = -step
     return current + d
+# ==================================================
+# POSTURE MODE RESOLVER (SAFE, COMPOSABLE)
+# ==================================================
+def apply_posture_mode():
+    global posture_roll_target, posture_pitch_target
+
+    # ❌ Do not allow posture changes mid-step
+    if step_active or fsm_state != "IDLE":
+        return
+
+    # Defaults
+    posture_roll_target  = 0.0
+    posture_pitch_target = 0.0
+
+    # ---------- MODE DEFINITIONS ----------
+    if posture_mode == "STAND":
+        posture_roll_target  = 0.0
+        posture_pitch_target = 0.0
+
+        for k in motion_offsets:
+            motion_offsets[k] = ramp(motion_offsets[k], 0.0, STAND_RECENTER_STEP)
+
+        for ch in mid_offsets:
+            mid_offsets[ch] = ramp(mid_offsets[ch], 0.0, MID_RECENTER_STEP)
+
+
+    elif posture_mode == "LEAN_LEFT":
+        posture_roll_target = +10.0
+
+    elif posture_mode == "LEAN_RIGHT":
+        posture_roll_target = -10.0
+
+    elif posture_mode == "LEAN_FWD":
+        posture_pitch_target = -15.0
+
+    elif posture_mode == "LEAN_BACK":
+        posture_pitch_target = +15.0
+
+    elif posture_mode == "SIT":
+        tgt = POSTURE_TARGETS["SIT"]
+        posture_pitch_target = 0.0   # DO NOT tilt body
+
+        for leg, val in tgt["feet"].items():
+            motion_offsets[leg] = ramp(
+                motion_offsets[leg],
+                val,      # ⚠️ NO SIGN HERE
+                0.6
+            )
+
+
+    elif posture_mode == "KNEEL":
+        tgt = POSTURE_TARGETS["KNEEL"]
+        posture_pitch_target = tgt["posture_pitch"]
+
+        # Shoulders
+        for leg, val in tgt["shoulders"].items():
+            motion_offsets[leg] = ramp(motion_offsets[leg], val, 0.8)
+
+        # Feet
+        for leg, val in tgt["feet"].items():
+            motion_offsets[leg] = ramp(motion_offsets[leg], val, 0.8)
+
+        # 🔥 Mid-limbs (NEW)
+        for ch, val in tgt["midlimbs"].items():
+            mid_offsets[ch] = ramp(mid_offsets[ch], val, MID_RECENTER_STEP)
+
+
+
+
+    # ---------- HARD SAFETY CLAMPS ----------
+    posture_roll_target  = max(-POSTURE_MAX_ROLL,  min(POSTURE_MAX_ROLL,  posture_roll_target))
+    posture_pitch_target = max(-POSTURE_MAX_PITCH, min(POSTURE_MAX_PITCH, posture_pitch_target))
+
 
 # Unload posture map (lean away from leg)
 UNLOAD_POSTURE = {
@@ -595,6 +735,44 @@ def start_unified_gui():
     # LEFT PANEL — CONTROLS + RAW STATE
     # ==================================================
     tk.Label(left, text="CONTROLS", font=FONT_HDR, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(8, 4))
+    # ---------------- POSTURE MODES ----------------
+    tk.Label(left, text="POSTURE", font=FONT_HDR, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(12, 4))
+
+    def set_posture(m):
+        global posture_mode, last_posture_change_time
+        global posture_roll_bias, posture_pitch_bias
+        global stand_recenter_until
+
+        posture_mode = m
+        last_posture_change_time = time.time()
+
+        posture_roll_bias  = 0.0
+        posture_pitch_bias = 0.0
+
+        if m == "STAND":
+            stand_recenter_until = time.time() + STAND_IMPULSE_TIME
+
+
+    tk.Button(left, text="STAND", command=lambda: set_posture("STAND"),
+            bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=2)
+
+    tk.Button(left, text="LEAN LEFT", command=lambda: set_posture("LEAN_LEFT"),
+            bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=2)
+
+    tk.Button(left, text="LEAN RIGHT", command=lambda: set_posture("LEAN_RIGHT"),
+            bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=2)
+
+    tk.Button(left, text="LEAN FWD", command=lambda: set_posture("LEAN_FWD"),
+            bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=2)
+
+    tk.Button(left, text="LEAN BACK", command=lambda: set_posture("LEAN_BACK"),
+            bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=2)
+
+    tk.Button(left, text="SIT", command=lambda: set_posture("SIT"),
+            bg="#333333", fg="#ffffff", relief="flat").pack(fill="x", padx=10, pady=(6,2))
+
+    tk.Button(left, text="KNEEL", command=lambda: set_posture("KNEEL"),
+            bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=2)
 
     selected_leg_var = tk.StringVar(value="None")
 
@@ -1094,8 +1272,14 @@ while True:
 
         
         # ==================================================
+        # APPLY POSTURE MODE (HIGH-LEVEL INTENT)
+        # ==================================================
+        apply_posture_mode()
+
+        # ==================================================
         # APPLY POSTURE BIAS (Layer-2)
         # ==================================================
+
 
         # Ramp posture bias toward target
         posture_roll_bias  = ramp(posture_roll_bias,  posture_roll_target,  POSTURE_STEP)
@@ -1254,17 +1438,33 @@ while True:
         # STEP INVARIANT CHECK (DEBUG / SAFE)
         # ==================================================
         if fsm_state == "IDLE" and not step_active:
-            # Ownership must be fully released
             assert swing_leg is None
             assert disable_roll_pd is False
 
-            # Posture bias must be within absolute safety bounds
             assert abs(posture_roll_bias) <= POSTURE_MAX_ROLL
             assert abs(posture_pitch_bias) <= POSTURE_MAX_PITCH
 
-            # Motion offsets must be cleared
-            assert all(abs(motion_offsets[k]) < RECENTER_THRESH for k in motion_offsets)
-       
+            assert posture_mode in (
+                "STAND",
+                "LEAN_LEFT",
+                "LEAN_RIGHT",
+                "LEAN_FWD",
+                "LEAN_BACK",
+                "SIT",
+                "KNEEL",
+            )
+
+            # Posture mode must be valid
+            assert posture_mode in (
+                "STAND",
+                "LEAN_LEFT",
+                "LEAN_RIGHT",
+                "LEAN_FWD",
+                "LEAN_BACK",
+                "SIT",
+                "KNEEL",
+            )
+
         # ---------- ROLL REFLEX ----------
         # Shoulders widen/narrow stance to resist tipping
         gain_scale = BRACE_GAIN_SCALE if brace_active else 1.0
@@ -1324,7 +1524,6 @@ while True:
         # ---------- PITCH REFLEX ----------
         # Knees flex/extend to shift vertical load
         for leg, ch in FEET.items():
-            
             pitch_rate = gy / 131.0     # deg/s
             if abs(pitch_rate) < GYRO_RATE_DEADBAND:
                 pitch_rate = 0.0
@@ -1335,11 +1534,16 @@ while True:
             ) * (1 if leg.startswith("F") else -1)
             tgt = max(-PITCH_LIMIT, min(PITCH_LIMIT, tgt))
 
+            if posture_mode == "STAND" and not step_active:
+                tgt = 0.0
             delta = tgt - pitch_offsets[leg]
+
             delta = max(-PITCH_STEP, min(PITCH_STEP, delta))
             if abs(delta) < 0.05:
                 delta = 0.0
             pitch_offsets[leg] += delta
+
+            motion_offsets[leg] = max(-40.0, min(40.0, motion_offsets[leg]))
 
             angle = (
                 FOOT_STAND[leg]
@@ -1349,6 +1553,12 @@ while True:
             )
 
             angle = max(FOOT_LIMITS[leg][0], min(FOOT_LIMITS[leg][1], angle))
+            set_servo_angle(ch, angle)
+            servo_angles[ch] = angle
+        
+        # ---------- MID-LIMB POSTURE (kneel only) ----------
+        for ch, base in MID_LIMBS.items():
+            angle = base + mid_offsets[ch]
             set_servo_angle(ch, angle)
             servo_angles[ch] = angle
         
