@@ -177,6 +177,26 @@ last_printed_contact = 1.0
 CONTACT_PRINT_EPS = 0.08   # print only on meaningful change
 
 # ==================================================
+# AIRBORNE DETECTION STATE
+# ==================================================
+airborne_conf = 0.0          # 0.0 = grounded, 1.0 = airborne
+robot_airborne = False
+
+# Gravity unload threshold (raw accel units)
+GRAVITY_NOMINAL = 16384
+GRAVITY_LOSS_THRESH = 2600   # ~0.15g drop (slow lift)
+
+AIRBORNE_RISE = 0.18         # how fast airborne confidence rises
+AIRBORNE_FALL = 0.10         # how fast it decays
+# Slow lift detection (quasi-static)
+SLOW_LIFT_RISE = 0.06      # slow confidence rise
+SLOW_LIFT_FALL = 0.04
+SLOW_LIFT_CONTACT_MAX = 0.45
+SLOW_LIFT_EFFORT_MAX = 0.08
+
+
+
+# ==================================================
 # STEP PRIMITIVE (SEALED)
 # A STEP consists of:
 # UNLOADING → LIFTING → DONE → RECENTERING → CONTACT → IDLE
@@ -1129,6 +1149,31 @@ def start_unified_gui():
     )
     stab_val.pack(anchor="e", padx=10)
 
+    # ---------------- Airborne Confidence ----------------
+    tk.Label(
+        right,
+        text="AIRBORNE CONFIDENCE",
+        font=FONT_HDR,
+        fg=CYBER_TEXT,
+        bg=CYBER_PANEL
+    ).pack(anchor="w", padx=10, pady=(14, 4))
+
+    air_bg = tk.Frame(right, bg=CYBER_BAR_BG, height=14)
+    air_bg.pack(fill="x", padx=10)
+
+    air_fg = tk.Frame(air_bg, bg="#ff4444", width=0)
+    air_fg.pack(side="left", fill="y")
+
+    air_val = tk.Label(
+        right,
+        text="0.00",
+        font=FONT_MONO,
+        fg=CYBER_MUTED,
+        bg=CYBER_PANEL
+    )
+    air_val.pack(anchor="e", padx=10)
+
+
     # ---------------- Stop Recovery ----------------
     tk.Label(
         right,
@@ -1166,6 +1211,11 @@ def start_unified_gui():
 
     # ---------------- Update Loop ----------------
     def update():
+                # ---- Airborne bar update ----
+        air = monitor_state.get("airborne_conf", 0.0)
+        air_fg.config(width=int(240 * air))
+        air_val.config(text=f"{air:.2f}")
+
         imu_var.set(
             f"ROLL  {monitor_state['roll']:+6.2f} deg\n"
             f"PITCH {monitor_state['pitch']:+6.2f} deg\n"
@@ -1272,8 +1322,8 @@ CONTACT_EFFORT_HIGH = 0.12     # roll_effort above this → resistance
 CONTACT_OFFSET_LOW  = 0.06     # offset_change below this → constrained
 CONTACT_MOTION_MIN  = 1.0      # deg — ignore noise-level motion
 
-CONTACT_RISE = 0.25           # confidence rise rate
-CONTACT_FALL = 0.06            # confidence fall rate
+CONTACT_RISE = 0.10          # confidence rise rate
+CONTACT_FALL = 0.30            # confidence fall rate
 
 # ==================================================
 # SLIP / TRACTION ESTIMATION (READ-ONLY)
@@ -1303,6 +1353,15 @@ while True:
         az = safe_read_word(MPU_ADDR, ACCEL_XOUT_H + 4) - az_o
         gx = safe_read_word(MPU_ADDR, GYRO_XOUT_H) - gx_o
         gy = safe_read_word(MPU_ADDR, GYRO_XOUT_H + 2) - gy_o
+
+        # ---- RAW acceleration (DO NOT bias-correct) ----
+        ax_raw = safe_read_word(MPU_ADDR, ACCEL_XOUT_H)
+        ay_raw = safe_read_word(MPU_ADDR, ACCEL_XOUT_H + 2)
+        az_raw = safe_read_word(MPU_ADDR, ACCEL_XOUT_H + 4)
+        if int(time.time() * 10) % 10 == 0:
+            print(f"[DEBUG] az_raw={az_raw}")
+
+
         
         # ---------- BRACE DETECTION ----------
         dax = ax - last_ax
@@ -1332,8 +1391,8 @@ while True:
             brace_until = now + BRACE_DURATION
 
             mag = max(delta_a, 1.0)
-            brace_pitch_bias = -dax / mag * BRACE_MAX_BIAS
-            brace_roll_bias  = -day / mag * BRACE_MAX_BIAS
+            brace_pitch_bias = -day / mag * BRACE_MAX_BIAS   # front/back shove
+            brace_roll_bias  = -dax / mag * BRACE_MAX_BIAS   # left/right shove
             
             # ---------- BRACE DECAY ----------
         if brace_active:
@@ -1421,9 +1480,12 @@ while True:
         monitor_state["fsm_state"] = fsm_state
         monitor_state["step_active"] = step_active
         monitor_state["step_phase"] = fsm_state
-        monitor_state["ax"] = ax
-        monitor_state["ay"] = ay
-        monitor_state["az"] = az
+        monitor_state["ax"] = ax_raw
+        monitor_state["ay"] = ay_raw
+        monitor_state["az"] = az_raw
+        monitor_state["airborne"] = robot_airborne
+        monitor_state["airborne_conf"] = airborne_conf
+
 
         # ---- derived diagnostics ----
         avg_shoulder = sum(abs(v) for v in roll_offsets.values()) / len(roll_offsets)
@@ -1608,8 +1670,13 @@ while True:
         # STEP INVARIANT CHECK (DEBUG / SAFE)
         # ==================================================
         if fsm_state == "IDLE" and not step_active:
+            # HARD SAFETY: roll PD must be enabled in IDLE
+            if disable_roll_pd:
+                disable_roll_pd = False
+
             assert swing_leg is None
             assert disable_roll_pd is False
+
 
             assert abs(posture_roll_bias) <= POSTURE_MAX_ROLL
             assert abs(posture_pitch_bias) <= POSTURE_MAX_PITCH
@@ -1634,6 +1701,27 @@ while True:
                 "SIT",
                 "KNEEL",
             )
+
+        # ==================================================
+        # AIRBORNE SAFETY OVERRIDE
+        # ==================================================
+        if robot_airborne:
+            disable_roll_pd = True
+            posture_roll_target = 0.0
+            posture_pitch_target = 0.0
+
+            # Cancel steps safely
+            step_active = False
+            swing_leg = None
+            fsm_state = "IDLE"
+        
+        # ==================================================
+        # AIRBORNE RECOVERY (RE-ENABLE BALANCE)
+        # ==================================================
+        '''if not robot_airborne and disable_roll_pd:
+            if fsm_state == "IDLE" and not step_active:
+                disable_roll_pd = False'''
+
 
         # ---------- ROLL REFLEX ----------
         # Shoulders widen/narrow stance to resist tipping
@@ -1746,20 +1834,93 @@ while True:
         # FOOT CONTACT CONFIDENCE UPDATE (READ-ONLY)
         # ==================================================
         for leg in FEET:
-            if abs(motion_offsets[leg]) < CONTACT_MOTION_MIN:
-                continue
 
+            # ---------- SLOW LIFT / GRAVITY UNLOAD ----------
+            gravity_loss = abs(abs(az_raw) - GRAVITY_NOMINAL)
+            if int(time.time() * 10) % 10 == 0:
+                print(f"[DEBUG] gravity_loss={gravity_loss}")
+
+
+            if (
+                fsm_state == "IDLE"
+                and not step_active
+                and gravity_loss > GRAVITY_LOSS_THRESH
+                and abs(motion_offsets[leg]) < CONTACT_MOTION_MIN
+                and leg_motion_response[leg] > LEG_RESPONSE_HIGH
+            ):
+                foot_contact[leg] = max(0.0, foot_contact[leg] - CONTACT_FALL)
+                print(f"[CONTACT DECAY] {leg} gravity_loss={gravity_loss}")
+                pass
+
+            # ---------- ACTIVE STEP CASE ----------
             if fsm_state in ("LIFTING", "DONE"):
-                if (
-                    leg == swing_leg and
-                    abs(motion_offsets[leg]) > 0.5
-                ):
+                if leg == swing_leg and abs(motion_offsets[leg]) > 0.5:
                     foot_contact[leg] = max(0.0, foot_contact[leg] - CONTACT_FALL)
 
+            # ---------- RECOVERY ----------
             elif fsm_state in ("RECENTERING", "IDLE"):
                 foot_contact[leg] = min(1.0, foot_contact[leg] + CONTACT_RISE)
 
         monitor_state["foot_contact"] = dict(foot_contact)
+        # ==================================================
+        # AIRBORNE DETECTION (FUSED, AUTHORITATIVE)
+        # ==================================================
+
+        # 1) Overall ground confidence (worst foot)
+        ground_conf = min(foot_contact.values())
+        avg_contact = sum(foot_contact.values()) / len(foot_contact)
+
+        # 2) Count how many legs are "free moving"
+        free_legs = sum(
+            leg_motion_response[l] > LEG_RESPONSE_HIGH
+            for l in FEET
+        )
+
+        # 3) Acceleration magnitude anomaly (gravity disturbance)
+        acc_mag = math.sqrt(ax_raw*ax_raw + ay_raw*ay_raw + az_raw*az_raw)
+        acc_anomaly = abs(acc_mag - 16384)
+
+        # 4) Discrete airborne evidence score
+        airborne_score = 0
+        slow_lift = (
+            avg_contact < SLOW_LIFT_CONTACT_MAX and
+            roll_effort < SLOW_LIFT_EFFORT_MAX
+        )
+
+
+
+        if ground_conf < 0.25:
+            airborne_score += 2
+
+        if free_legs >= 3:
+            airborne_score += 2
+
+        if acc_anomaly > 3500:
+            airborne_score += 1
+        
+        # Convert score → confidence ramp
+        # PRIMARY airborne evidence: contact collapse
+        if avg_contact < 0.35:
+            airborne_conf = min(1.0, airborne_conf + AIRBORNE_RISE)
+
+        # SECONDARY: multiple free-moving legs
+        elif free_legs >= 3:
+            airborne_conf = min(1.0, airborne_conf + AIRBORNE_RISE)
+
+        # TERTIARY: acceleration anomaly (fast lift / drop)
+        elif acc_anomaly > 3500:
+            airborne_conf = min(1.0, airborne_conf + AIRBORNE_RISE)
+
+        else:
+            airborne_conf = max(0.0, airborne_conf - SLOW_LIFT_FALL)
+
+
+
+
+        robot_airborne = airborne_conf > 0.6
+        print(f"[AIR FLAG] robot_airborne={robot_airborne}")
+
+
         monitor_state["leg_motion_response"] = dict(leg_motion_response)
 
         # ==================================================
