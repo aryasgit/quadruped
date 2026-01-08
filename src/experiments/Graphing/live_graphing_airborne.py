@@ -11,7 +11,7 @@ import tkinter as tk
 from collections import deque
 import multiprocessing as mp
 from plotter_process import plotter_main
-from telemetry_pub import telemetry_publisher
+mp.set_start_method("fork", force=True)
 
 
 # ==================================================
@@ -419,6 +419,7 @@ gx_o /= 200; gy_o /= 200
 # ==================================================
 roll = 0.0
 pitch = 0.0
+posture_locked = False
 
 STAND_ROLL_REF = None
 STAND_PITCH_REF = None
@@ -448,13 +449,15 @@ plot_proc = mp.Process(
 )
 plot_proc.start()
 print("[PLOT] plotter process started")
-telem_proc = mp.Process(
-    target=telemetry_publisher,
-    args=(telemetry_q, 5555),
-    daemon=True
-)
-telem_proc.start()
-print("[TELEM] remote telemetry started")
+# ---- REMOTE TELEMETRY DISABLED ----
+# telem_proc = mp.Process(
+#     target=telemetry_publisher,
+#     args=(telemetry_q, 5555),
+#     daemon=True
+# )
+# telem_proc.start()
+# print("[TELEM] remote telemetry started")
+
 
 
 # ===============================
@@ -749,6 +752,9 @@ BRACE_ACCEL_THRESHOLD = 3000     # raw accel delta
 BRACE_DURATION = 0.25            # seconds
 BRACE_GAIN_SCALE = 0.6           # soften controller
 BRACE_MAX_BIAS = 12.0            # deg (keep small)
+BRACE_GAIN_PITCH = 0.45   # forward/back (less trusted)
+BRACE_GAIN_ROLL  = 1.0    # left/right (fully trusted)
+
 
 brace_active = False
 brace_until = 0.0
@@ -1358,10 +1364,6 @@ while True:
         ax_raw = safe_read_word(MPU_ADDR, ACCEL_XOUT_H)
         ay_raw = safe_read_word(MPU_ADDR, ACCEL_XOUT_H + 2)
         az_raw = safe_read_word(MPU_ADDR, ACCEL_XOUT_H + 4)
-        if int(time.time() * 10) % 10 == 0:
-            print(f"[DEBUG] az_raw={az_raw}")
-
-
         
         # ---------- BRACE DETECTION ----------
         dax = ax - last_ax
@@ -1391,9 +1393,11 @@ while True:
             brace_until = now + BRACE_DURATION
 
             mag = max(delta_a, 1.0)
-            brace_pitch_bias = -day / mag * BRACE_MAX_BIAS   # front/back shove
-            brace_roll_bias  = -dax / mag * BRACE_MAX_BIAS   # left/right shove
-            
+            brace_pitch_bias = -BRACE_GAIN_PITCH * dax / mag * BRACE_MAX_BIAS
+            brace_roll_bias  = -BRACE_GAIN_ROLL  * day / mag * BRACE_MAX_BIAS
+            if abs(dax) < 0.7 * abs(day):
+                brace_pitch_bias = 0.0
+
             # ---------- BRACE DECAY ----------
         if brace_active:
             if now > brace_until:
@@ -1455,8 +1459,10 @@ while True:
         # ==================================================
         # APPLY POSTURE MODE (HIGH-LEVEL INTENT)
         # ==================================================
-        apply_posture_mode()
-        demo_tick()
+        if fsm_state == "IDLE" and not step_active:
+            apply_posture_mode()
+            demo_tick()
+
 
         # ==================================================
         # APPLY POSTURE BIAS (Layer-2)
@@ -1543,9 +1549,9 @@ while True:
         # ==================================================
            
         if fsm_state == "STOP_HOLD":
-            # absolutely no motion
-            posture_roll_target = 0.0
-            posture_pitch_target = 0.0
+            if not posture_locked:
+                posture_roll_target = 0.0
+                posture_pitch_target = 0.0
 
             for k in motion_offsets:
                 motion_offsets[k] = 0.0
@@ -1558,14 +1564,13 @@ while True:
         if fsm_state == "IDLE" and motion_armed:
             if swing_leg is not None:
                 step_active = True
+                posture_locked = True   # 🔒 LOCK posture
                 posture_roll_target  = UNLOAD_POSTURE[swing_leg]["roll"]
                 posture_pitch_target = UNLOAD_POSTURE[swing_leg]["pitch"]
                 unload_start = time.time()
-
-                # IMPORTANT: freeze roll PD application
                 disable_roll_pd = True
-
                 fsm_state = "UNLOADING"
+
 
         elif fsm_state == "UNLOADING":
             # Authoritative geometric unload
@@ -1597,9 +1602,8 @@ while True:
                 fsm_state = "DONE"
                 
         elif fsm_state == "DONE":
-            posture_roll_target = 0.0
-            posture_pitch_target = 0.0
             fsm_state = "RECENTERING"
+
                 
         elif fsm_state == "RECENTERING":
             # Gradually remove posture bias
@@ -1660,7 +1664,7 @@ while True:
             swing_leg = None
             gui_selected_leg = None
             step_active = False
-            
+            posture_locked = False   # 🔓 RELEASE posture control
 
             # FSM returns to neutral
             monitor_state["last_step_ok"] = (foot_contact[completed_leg] > 0.75)
@@ -1705,8 +1709,8 @@ while True:
         # ==================================================
         # AIRBORNE SAFETY OVERRIDE
         # ==================================================
-        if robot_airborne:
-            disable_roll_pd = True
+        if robot_airborne and not posture_locked:
+            disable_roll_pd = False
             posture_roll_target = 0.0
             posture_pitch_target = 0.0
 
@@ -1714,7 +1718,7 @@ while True:
             step_active = False
             swing_leg = None
             fsm_state = "IDLE"
-        
+
         # ==================================================
         # AIRBORNE RECOVERY (RE-ENABLE BALANCE)
         # ==================================================
@@ -1837,9 +1841,6 @@ while True:
 
             # ---------- SLOW LIFT / GRAVITY UNLOAD ----------
             gravity_loss = abs(abs(az_raw) - GRAVITY_NOMINAL)
-            if int(time.time() * 10) % 10 == 0:
-                print(f"[DEBUG] gravity_loss={gravity_loss}")
-
 
             if (
                 fsm_state == "IDLE"
@@ -1849,7 +1850,6 @@ while True:
                 and leg_motion_response[leg] > LEG_RESPONSE_HIGH
             ):
                 foot_contact[leg] = max(0.0, foot_contact[leg] - CONTACT_FALL)
-                print(f"[CONTACT DECAY] {leg} gravity_loss={gravity_loss}")
                 pass
 
             # ---------- ACTIVE STEP CASE ----------
@@ -1914,13 +1914,7 @@ while True:
         else:
             airborne_conf = max(0.0, airborne_conf - SLOW_LIFT_FALL)
 
-
-
-
         robot_airborne = airborne_conf > 0.6
-        print(f"[AIR FLAG] robot_airborne={robot_airborne}")
-
-
         monitor_state["leg_motion_response"] = dict(leg_motion_response)
 
         # ==================================================

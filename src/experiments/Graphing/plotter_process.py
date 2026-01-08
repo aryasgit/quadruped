@@ -1,3 +1,5 @@
+import os
+os.environ["QT_QPA_PLATFORM"] = "xcb"
 import sys, time
 import multiprocessing as mp
 from collections import deque
