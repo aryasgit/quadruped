@@ -26,13 +26,21 @@ PULSE_MIN = 80
 PULSE_MAX = 561
 
 bus = SMBus(BUS)
+# ===============================
+# IMU DISPLAY FILTER
+# ===============================
+IMU_ALPHA = 0.93   # closer to 1 = slower, smoother
+
+disp_roll = 0.0
+disp_pitch = 0.0
+
 
 # ===============================
 # SERVO MAP
 # ===============================
 SERVO_MAP = {
-    0: 38, 1: 38, 2: 102, 3: 154, 4: 128, 5: 77, 
-    6: 37, 7: 46, 8: 104, 9: 165, 10: 130, 11: 61
+    0: 41, 1: 38, 2: 102, 3: 154, 4: 125, 5: 77, 
+    6: 47, 7: 46, 8: 100, 9: 168, 10: 105, 11: 74
 }
 
 SERVO_NAMES = [
@@ -130,11 +138,17 @@ def update_imu():
     ay = read_word(ACCEL_XOUT_H + 2)
     az = read_word(ACCEL_XOUT_H + 4)
 
-    roll = math.degrees(math.atan2(ay, az))
-    pitch = math.degrees(math.atan2(-ax, math.sqrt(ay*ay + az*az)))
+    raw_roll = math.degrees(math.atan2(ay, az))
+    raw_pitch = math.degrees(math.atan2(-ax, math.sqrt(ay*ay + az*az)))
 
-    roll_label.config(text=f"Roll: {roll:+6.2f}°")
-    pitch_label.config(text=f"Pitch: {pitch:+6.2f}°")
+    global disp_roll, disp_pitch
+    disp_roll  = IMU_ALPHA * disp_roll  + (1 - IMU_ALPHA) * raw_roll
+    disp_pitch = IMU_ALPHA * disp_pitch + (1 - IMU_ALPHA) * raw_pitch
+
+
+    roll_label.config(text=f"Roll: {disp_roll:+6.2f}°")
+    pitch_label.config(text=f"Pitch: {disp_pitch:+6.2f}°")
+
 
     root.after(50, update_imu)   # ~20 Hz
 

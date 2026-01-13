@@ -208,6 +208,10 @@ STOMP_SLAM_MAX_TIME = 0.18   # seconds (HARD CAP)
 
 step_active = False
 
+manual_leg = None      # GUI-selected leg only
+manual_mode = False   # True = GUI controls FSM
+
+
 # ==================================================
 # GAIT SEQUENCER (SAFE, EVENT-DRIVEN)
 # ==================================================
@@ -852,15 +856,15 @@ UNLOAD_SHOULDER_OFFSETS = {
     },
     # Lifting REAR RIGHT foot
     "RRF": {
-        "FR": +7.0,
-        "FL": +7.0,
+        "FR": +10.0,
+        "FL": +10.0,
         "RL": -15.0,
         "RR":  0.0,
     },
     # Lifting REAR LEFT foot
     "RLF": {
-        "FR": +5.0,
-        "FL": +5.0,
+        "FR": +9.0,
+        "FL": +9.0,
         "RR": -10.0,
         "RL":  0.0,
     },
@@ -878,8 +882,8 @@ gui_selected_leg = None      # "FRF", "FLF", "RRF", "RLF"
 gui_enabled = False
 
 # LIFT parameters
-LIFT_HEIGHT = 15.0      # deg (knee flex offset as motion)
-LIFT_STEP = 0.8         # deg per cycle for knee motion
+LIFT_HEIGHT = 30.0      # deg (knee flex offset as motion)
+LIFT_STEP = 1        # deg per cycle for knee motion
 UNLOAD_SETTLE_THRESH = 1.0  # deg — how close IMU must be to posture bias
 
 # ==================================================
@@ -1039,11 +1043,47 @@ def start_unified_gui():
     main = tk.Frame(root, bg="#0b0b0b")
     main.pack(fill="both", expand=True, padx=8, pady=8)
 
-    left  = tk.Frame(main, bg="#151515", width=300)
-    right = tk.Frame(main, bg="#151515")
+    # ================= LEFT SCROLLABLE PANEL =================
+    left_container = tk.Frame(main, bg="#151515", width=320)
+    left_container.pack(side="left", fill="y", padx=(0, 8))
 
-    left.pack(side="left", fill="y", padx=(0, 8))
+    left_canvas = tk.Canvas(
+        left_container,
+        bg="#151515",
+        highlightthickness=0,
+        width=200
+    )
+    left_canvas.pack(side="left", fill="both", expand=True)
+
+    left_scroll = tk.Scrollbar(
+        left_container,
+        orient="vertical",
+        command=left_canvas.yview
+    )
+    left_scroll.pack(side="right", fill="y")
+
+    left_canvas.configure(yscrollcommand=left_scroll.set)
+
+    # 👇 THIS replaces your old `left` frame
+    left = tk.Frame(left_canvas, bg="#151515")
+    left_canvas.create_window((0, 0), window=left, anchor="nw")
+
+    # Auto-update scroll region
+    def _on_left_configure(event):
+        left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+
+    left.bind("<Configure>", _on_left_configure)
+
+    # Mouse wheel support
+    def _on_mousewheel(event):
+        left_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    left_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+    # ================= RIGHT PANEL (UNCHANGED) =================
+    right = tk.Frame(main, bg="#151515")
     right.pack(side="right", fill="both", expand=True)
+
 
     # ==================================================
     # LEFT PANEL — CONTROLS + RAW STATE
@@ -1184,13 +1224,14 @@ def start_unified_gui():
 
 
     def select_leg(leg):
-        global gui_selected_leg
-        accepted = request_step(leg)
-        if accepted:
-            gui_selected_leg = leg
-            selected_leg_var.set(leg)
-        else:
+        global manual_leg, manual_mode
+        if step_active or fsm_state != "IDLE":
             selected_leg_var.set("BUSY")
+            return
+
+        manual_leg = leg
+        manual_mode = True
+        selected_leg_var.set(leg)
 
     for leg in ["FRF", "FLF", "RRF", "RLF"]:
         tk.Button(
@@ -1207,10 +1248,37 @@ def start_unified_gui():
     tk.Label(left, textvariable=selected_leg_var, font=FONT_MONO, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10)
 
     def lift():
-        pass
+        global swing_leg, step_active, fsm_state
+        global posture_locked, disable_roll_pd, unload_start
+
+        if manual_leg is None:
+            return
+        if fsm_state != "IDLE":
+            return
+
+        swing_leg = manual_leg
+        step_active = True
+        posture_locked = True
+        manual_mode = True
+
+        posture_roll_target  = UNLOAD_POSTURE[swing_leg]["roll"]
+        posture_pitch_target = UNLOAD_POSTURE[swing_leg]["pitch"]
+
+        disable_roll_pd = True
+        unload_start = time.time()
+        fsm_state = "UNLOADING"
+
         
     def lower():
-        pass
+        global fsm_state
+
+        if not manual_mode:
+            return
+        if fsm_state not in ("LIFTING",):
+            return
+
+        fsm_state = "RECENTERING"
+
 
     tk.Button(left, text="LIFT", command=lift, bg="#333333", fg="#ffffff", relief="flat", font=FONT_HDR).pack(fill="x", padx=10, pady=(12, 4))
     tk.Button(left, text="LOWER", command=lower, bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=4)
@@ -1974,7 +2042,7 @@ while True:
                 motion_offsets[shoulder] = ramp(
                     motion_offsets[shoulder],
                     servo_target,
-                    0.8
+                    2
                 )
 
             # TIME-GATED EXIT (AUTHORITATIVE)
@@ -1992,7 +2060,11 @@ while True:
             )
 
             if abs(motion_offsets[swing_leg] - servo_lift) < 0.3:
-                fsm_state = "DONE"
+                if manual_mode:
+                    pass            # 🔒 stay lifted, wait for LOWER
+                else:
+                    fsm_state = "DONE"
+
                 
         elif fsm_state == "DONE":
             fsm_state = "RECENTERING"
@@ -2017,16 +2089,20 @@ while True:
                 all(abs(motion_offsets[k]) < RECENTER_THRESH for k in motion_offsets)
             )
             if all_centered:
-                # Reset roll offsets so PD resumes from neutral
                 for k in roll_offsets:
                     roll_offsets[k] = 0.0
 
-                # Re-enable roll PD cleanly
                 disable_roll_pd = False
 
                 swing_leg = None
                 gui_selected_leg = None
-                fsm_state = "IDLE"    
+
+                # 🔓 EXIT MANUAL MODE CLEANLY
+                manual_leg = None
+                manual_mode = False
+
+                fsm_state = "IDLE"
+
                     
         # ==================================================
         # STEP COMPLETION — CONTACT-GATED (FINAL)

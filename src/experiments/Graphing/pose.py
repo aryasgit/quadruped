@@ -17,7 +17,7 @@ mp.set_start_method("fork", force=True)
 # ==================================================
 # LIVE TELEMETRY IPC (PROCESS-SAFE)
 # ==================================================
-telemetry_q = mp.Queue(maxsize=200)
+telemetry_q = mp.Queue(maxsize=50)
 
 # ==================================================
 # I2C CONFIG (HARDWARE — DO NOT TWEAK)
