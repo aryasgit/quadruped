@@ -268,6 +268,8 @@ POSTURE_ID = {
     "SIT": 5,
     "KNEEL": 6,
     "SHOW": 7,
+    "REAR_LIFT": 8,
+
 }
 
 # ==================================================
@@ -389,6 +391,22 @@ MID_LIMBS = {
     2: 102,   # RRM
     3: 154,   # RLM
 }
+# Mid-limb direction signs (mirror rule)
+# Right side = +1, Left side = -1
+MID_SIGN = {
+    8: +1,   # FRM (front right mid)
+    9: -1,   # FLM (front left mid)
+    2: +1,   # RRM (rear right mid)
+    3: -1,   # RLM (rear left mid)
+}
+
+
+# Rear mid-limb channels only
+REAR_MID_LIMBS = {
+    2: MID_LIMBS[2],   # RRM
+    3: MID_LIMBS[3],   # RLM
+}
+
 
 for ch, angle in MID_LIMBS.items():
     set_servo_angle(ch, angle)
@@ -505,6 +523,14 @@ pump_start_time = 0.0
 
 PUMP_FREQ = 0.6        # Hz (slow, dog-like)
 PUMP_AMP  = 10.0       # degrees (SAFE: 6–12)
+
+# ==================================================
+# REAR MID-LIMB LIFT + FOOT DROP (CONTINUOUS)
+# ==================================================
+REAR_LIFT_FREQ = 0.4      # Hz (slow, stable)
+REAR_MID_AMP   = 10.0     # degrees (SAFE)
+FOOT_DROP_AMP  = 20.0     # degrees (SAFE)
+
 
 # ==================================================
 # POSTURE MODES (HIGH-LEVEL INTENT)
@@ -646,6 +672,20 @@ def knee_pump(t):
     """
     return PUMP_AMP * math.sin(2 * math.pi * PUMP_FREQ * t)
 
+def rear_lift_wave(t):
+    """
+    Continuous rear mid-limb lift + foot drop.
+    Rear mid-limbs lift upward.
+    All feet lower symmetrically.
+    """
+    phase = math.sin(2 * math.pi * REAR_LIFT_FREQ * t)
+
+    mid_offset = REAR_MID_AMP * phase
+    foot_offset = -FOOT_DROP_AMP * phase   # negative = drop
+
+    return mid_offset, foot_offset
+
+
 
 def apply_posture_mode():
     global posture_roll_target, posture_pitch_target
@@ -710,6 +750,33 @@ def apply_posture_mode():
         for ch, val in tgt["midlimbs"].items():
             mid_offsets[ch] = ramp(mid_offsets[ch], val, MID_RECENTER_STEP)
     
+    elif posture_mode == "REAR_LIFT":
+        t = time.time() - last_posture_change_time
+
+        mid_delta, foot_delta = rear_lift_wave(t)
+
+        # ---- Rear mid-limbs only ----
+        for ch in REAR_MID_LIMBS:
+            mid_offsets[ch] = ramp(
+                mid_offsets[ch],
+                MID_SIGN[ch] * mid_delta,
+                MID_RECENTER_STEP
+            )
+
+
+        # ---- All feet ----
+        for leg in FEET:
+            motion_offsets[leg] = ramp(
+                motion_offsets[leg],
+                FOOT_SIGN[leg] * foot_delta,
+                1.0
+            )
+
+
+        posture_roll_target  = 0.0
+        posture_pitch_target = 0.0
+
+
     elif posture_mode == "SHOW":
         # SHOW mode is currently limited to safe upper-body motion only
         if show_motion is None:
@@ -1070,14 +1137,14 @@ def start_unified_gui():
         pump_active = False
 
     tk.Button(
-        left, text="🐕 PUMP",
+        left, text="🐕 SWAY",
         command=start_pump,
         bg="#224422", fg="#ccffcc",
         relief="flat", font=FONT_HDR
     ).pack(fill="x", padx=10, pady=4)
 
     tk.Button(
-        left, text="STOP PUMP",
+        left, text="STOP SWAY",
         command=stop_pump,
         bg="#222222", fg="#e6e6e6",
         relief="flat"
@@ -1087,10 +1154,18 @@ def start_unified_gui():
     tk.Label(left, text="SHOW MOTIONS", font=FONT_HDR,
          fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(6,2))
 
-    tk.Button(left, text="SWAY",
+    tk.Button(left, text="IGNORE",
             command=set_sway,
             bg="#222222", fg="#e6e6e6",
             relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=2)
+    
+    tk.Button(
+        left, text="PUMP UP DOWN",
+        command=lambda: set_posture("REAR_LIFT"),
+        bg="#333333", fg="#ffffff",
+        relief="flat"
+    ).pack(fill="x", padx=10, pady=2)
+
 
     # ---------------- LOG CONTROL ----------------
     tk.Label(left, text="LOGGING", font=FONT_HDR,
@@ -2003,6 +2078,7 @@ while True:
                 "SIT",
                 "KNEEL",
                 "SHOW",
+                "REAR_LIFT"
             )
 
 
@@ -2016,6 +2092,7 @@ while True:
                 "SIT",
                 "KNEEL",
                 "SHOW",
+                "REAR_LIFT"
             )
 
 
