@@ -129,6 +129,18 @@ FOOT_SIGN = {
 # Mechanical safety limits — PREVENT DAMAGE
 FOOT_LIMITS = {k: (0, 190) for k in FEET}
 
+# Which shoulders primarily support which foot
+LEG_SUPPORT_SHOULDERS = {
+    "FRF": ("FL", "RL"),   # support diagonally opposite
+    "FLF": ("FR", "RR"),
+    "RRF": ("FL", "RL"),
+    "RLF": ("FR", "RR"),
+}
+
+ROLL_GAIN_SUPPORT = 1.25     # stronger support reaction
+ROLL_GAIN_UNLOAD  = 0.55     # soften swing side
+ROLL_GAIN_NEUTRAL = 1.0
+
 # ==================================================
 # CONTROL PARAMETERS (THIS IS WHERE YOU TUNE)
 # ==================================================
@@ -194,7 +206,6 @@ SLOW_LIFT_FALL = 0.04
 SLOW_LIFT_CONTACT_MAX = 0.45
 SLOW_LIFT_EFFORT_MAX = 0.08
 
-STOMP_SLAM_MAX_TIME = 0.18   # seconds (HARD CAP)
 
 
 
@@ -228,6 +239,7 @@ STOP_HOLD_TIME = 1.5   # seconds
 stop_hold_until = 0.0
 
 show_motion = None   # default
+
 
 
 # ==================================================
@@ -327,7 +339,7 @@ if LOG_ENABLE:
         "roll,pitch,"
         "posture_roll,posture_pitch,"
         "roll_effort,offset_change,"
-        "posture_mode,fsm,stomp_phase\n"
+        "posture_mode,fsm\n"
     )
     log_f.flush()
     
@@ -441,14 +453,6 @@ STAND_ROLL_REF = None
 STAND_PITCH_REF = None
 stand_ref_locked = False
 
-# ==================================================
-# STOMP (SHOW MODE, FSM-BASED)
-# ==================================================
-stomp_active = False
-stomp_phase = "IDLE"   # IDLE / UNLOAD / LIFT / SLAM
-stomp_leg = "FRF"      # start with front-right
-stomp_t0 = 0.0
-
 # ADD — BALANCE EFFORT MONITOR (one-time initialization)
 # Place immediately after roll/pitch / posture variables
 last_roll_cmd = 0.0
@@ -492,11 +496,15 @@ print("[PLOT] plotter process started")
 # ==================================================
 show_active = False
 show_start_time = 0.0
-SHOW_FREQ_SWAY = 0.4     # Hz (slow = dramatic)
-SHOW_FREQ_SQUAT = 0.25
-SHOW_ROLL_AMP = 18.0     # degrees
-SHOW_PITCH_AMP = 22.0
-SHOW_KNEE_AMP = 12.0
+
+# ==================================================
+# GLOBAL ACTION: KNEE PUMP (SAFE, SYMMETRIC)
+# ==================================================
+pump_active = False
+pump_start_time = 0.0
+
+PUMP_FREQ = 0.6        # Hz (slow, dog-like)
+PUMP_AMP  = 10.0       # degrees (SAFE: 6–12)
 
 # ==================================================
 # POSTURE MODES (HIGH-LEVEL INTENT)
@@ -631,62 +639,13 @@ def sway(t):
 
     return roll, pitch, knee
 
-def squat(t):
+def knee_pump(t):
     """
-    Slow squat down → powerful rise.
+    Symmetric knee pump.
+    All feet move together (no unloading).
     """
-    phase = math.sin(2 * math.pi * 0.25 * t)
+    return PUMP_AMP * math.sin(2 * math.pi * PUMP_FREQ * t)
 
-    roll = 0.0
-    pitch = -28.0 * max(0.0, phase)   # only squat downward
-    knee = 18.0 * max(0.0, phase)
-
-    return roll, pitch, knee
-
-def bow(t):
-    """
-    Forward bow with pause and return.
-    """
-    cycle = t % 4.0
-
-    if cycle < 1.2:          # lean forward
-        pitch = -18.0 * (cycle / 1.2)
-    elif cycle < 2.2:        # hold
-        pitch = -18.0
-    else:                    # return
-        pitch = -18.0 * max(0.0, 1 - (cycle - 2.2) / 1.8)
-
-    return 0.0, pitch, 0.0
-
-def stomp(t):
-    """
-    EXTREME single-leg stomp.
-    Visually violent, demo-only.
-    """
-
-    cycle = t % 1.6   # shorter = more aggressive
-
-    roll = 0.0
-    pitch = 0.0
-    knee = 0.0
-
-    # ---- Phase 1: anticipation (freeze) ----
-    if cycle < 0.25:
-        pitch = -8.0   # lean forward HARD
-
-    # ---- Phase 2: explosive lift ----
-    elif cycle < 0.55:
-        knee = 32.0 * ((cycle - 0.25) / 0.30)
-
-    # ---- Phase 3: SLAM (VERY FAST) ----
-    elif cycle < 0.65:
-        knee = 32.0 - 70.0 * ((cycle - 0.55) / 0.10)
-
-    # ---- Phase 4: recoil ----
-    elif cycle < 1.1:
-        pitch = +12.0 * (1 - (cycle - 0.65) / 0.45)
-
-    return roll, pitch, knee
 
 def apply_posture_mode():
     global posture_roll_target, posture_pitch_target
@@ -752,31 +711,27 @@ def apply_posture_mode():
             mid_offsets[ch] = ramp(mid_offsets[ch], val, MID_RECENTER_STEP)
     
     elif posture_mode == "SHOW":
-
-        if stomp_active:
-            posture_roll_target = posture_roll_target
-            posture_pitch_target = posture_pitch_target
-            return
+        # SHOW mode is currently limited to safe upper-body motion only
         if show_motion is None:
-            # Fail-safe: do nothing in SHOW until a motion is selected
-            posture_roll_target = 0.0
+            posture_roll_target  = 0.0
             posture_pitch_target = 0.0
             return
 
         t = time.time() - show_start_time
-        posture_roll_target, posture_pitch_target, knee = show_motion(t)
+        # New sway does NOT affect posture
+        posture_roll_target  = 0.0
+        posture_pitch_target = 0.0
 
-        # Clear all knee motion first
+
+        # HARD SAFETY: SHOW must never command knees
         for leg in FEET:
-            motion_offsets[leg] = ramp(motion_offsets[leg], 0.0, 0.8)
+            motion_offsets[leg] = ramp(
+                motion_offsets[leg],
+                0.0,
+                0.8
+            )
 
-        # Apply stomp knee to ONE leg
-        STOMP_LEG = "FRF"
-        motion_offsets[STOMP_LEG] = ramp(
-            motion_offsets[STOMP_LEG],
-            knee,
-            3.5    # faster for impact
-        )
+
 
 
 
@@ -960,49 +915,10 @@ def start_unified_gui():
     CYBER_TEXT = "#e6e6e6"
     CYBER_MUTED = "#9a9a9a"
 
-    def set_stomp():
-        global posture_mode, stomp_active, stomp_phase, stomp_t0
-        global swing_leg, step_active, fsm_state, show_motion
-        global log_active
-
-        if step_active or fsm_state != "IDLE":
-            return
-
-        show_motion = None   # 🔥 CRITICAL
-
-        log_active = True
-        log_f.write("# EVENT_START %.3f\n" % time.time())
-        log_f.flush()
-
-        stomp_leg = "FRF"
-        swing_leg = stomp_leg
-        step_active = True
-        posture_mode = "SHOW"
-
-        stomp_active = True
-        stomp_phase = "UNLOAD"
-        stomp_t0 = time.time()
-
-
-
-
-
     def set_sway():
         global show_motion, posture_mode, show_start_time
         posture_mode = "SHOW"
         show_motion = sway
-        show_start_time = time.time()
-
-    def set_squat():
-        global show_motion, posture_mode, show_start_time
-        posture_mode = "SHOW"
-        show_motion = squat
-        show_start_time = time.time()
-
-    def set_bow():
-        global show_motion, posture_mode, show_start_time
-        posture_mode = "SHOW"
-        show_motion = bow
         show_start_time = time.time()
 
     global gui_selected_leg
@@ -1129,11 +1045,8 @@ def start_unified_gui():
             bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=2)
     
     def start_show():
-        global posture_mode, show_start_time, demo_active, show_motion
-        demo_active = False
         posture_mode = "SHOW"
-        show_motion = sway          # <-- SET HERE
-        show_start_time = time.time()
+        show_motion = sway
 
     tk.Button(
         left,
@@ -1145,6 +1058,32 @@ def start_unified_gui():
         font=FONT_HDR
     ).pack(fill="x", padx=10, pady=(8,4))
 
+    def start_pump():
+        global pump_active, pump_start_time
+        if step_active or fsm_state != "IDLE":
+            return
+        pump_active = True
+        pump_start_time = time.time()
+
+    def stop_pump():
+        global pump_active
+        pump_active = False
+
+    tk.Button(
+        left, text="🐕 PUMP",
+        command=start_pump,
+        bg="#224422", fg="#ccffcc",
+        relief="flat", font=FONT_HDR
+    ).pack(fill="x", padx=10, pady=4)
+
+    tk.Button(
+        left, text="STOP PUMP",
+        command=stop_pump,
+        bg="#222222", fg="#e6e6e6",
+        relief="flat"
+    ).pack(fill="x", padx=10, pady=2)
+
+
     tk.Label(left, text="SHOW MOTIONS", font=FONT_HDR,
          fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(6,2))
 
@@ -1152,23 +1091,6 @@ def start_unified_gui():
             command=set_sway,
             bg="#222222", fg="#e6e6e6",
             relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=2)
-
-    tk.Button(left, text="SQUAT",
-            command=set_squat,
-            bg="#222222", fg="#e6e6e6",
-            relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=2)
-
-    tk.Button(left, text="BOW",
-            command=set_bow,
-            bg="#222222", fg="#e6e6e6",
-            relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=2)
-    
-    tk.Button(
-        left, text="STOMP",
-        command=set_stomp,
-        bg="#440000", fg="#ffdddd",
-        relief="flat", font=FONT_HDR
-    ).pack(fill="x", padx=10, pady=4)
 
     # ---------------- LOG CONTROL ----------------
     tk.Label(left, text="LOGGING", font=FONT_HDR,
@@ -1757,7 +1679,6 @@ while True:
                     f"{rel_roll:.2f},{rel_pitch:.2f},"
                     f"{posture_roll_bias:.2f},{posture_pitch_bias:.2f},"
                     f"{roll_effort:.3f},{offset_change:.3f},"
-                    f"{posture_mode},{fsm_state},{stomp_phase}\n"
                 )
 
                 last_servo_angles[ch] = servo_ang
@@ -1838,92 +1759,6 @@ while True:
         if fsm_state == "IDLE" and not step_active:
             apply_posture_mode()
             demo_tick()
-
-        # ==================================================
-        # STOMP FSM (SHOW MODE, SAFE)
-        # ==================================================
-        if stomp_active and fsm_state == "IDLE" and not step_active:
-
-            # ---- UNLOAD ----
-            if stomp_phase == "UNLOAD":
-                posture_roll_target  = UNLOAD_POSTURE[stomp_leg]["roll"]
-                posture_pitch_target = UNLOAD_POSTURE[stomp_leg]["pitch"]
-
-                if abs(posture_roll_bias - posture_roll_target) < 1.0:
-                    stomp_phase = "LIFT"
-                    stomp_t0 = time.time()
-
-            # ---- LIFT ----
-            elif stomp_phase == "LIFT":
-                body_lift = 32.0
-                servo_lift = FOOT_SIGN[stomp_leg] * body_lift
-
-                motion_offsets[stomp_leg] = ramp(
-                    motion_offsets[stomp_leg],
-                    servo_lift,
-                    2.2
-                )
-
-                # 🔥 HARD REQUIREMENT: foot must unload
-                if foot_contact[stomp_leg] < 0.25:
-                    stomp_phase = "SLAM"
-                    stomp_t0 = time.time()
-                    disable_roll_pd = True     # freeze balance
-                    brace_active = False      # no reflex damping
-
-
-
-            # ---- SLAM ----
-            # ---- SLAM (IMPULSIVE) ----
-            # ---- SLAM (IMPULSIVE) ----
-            elif stomp_phase == "SLAM":
-
-                # single-cycle impulse
-                motion_offsets[stomp_leg] -= FOOT_SIGN[stomp_leg] * 7.0
-
-                motion_offsets[stomp_leg] = max(
-                    -40.0, min(40.0, motion_offsets[stomp_leg])
-                )
-
-                # exit on contact OR timeout
-                if (
-                    foot_contact[stomp_leg] > 0.6 or
-                    (time.time() - stomp_t0) > STOMP_SLAM_MAX_TIME
-                ):
-                    disable_roll_pd = False
-
-                    # ----- HARD RESET STEP FSM -----
-                    step_active = False
-                    swing_leg = None
-                    fsm_state = "IDLE"
-                    posture_locked = False
-
-                    # Restore posture targets
-                    posture_roll_target = 0.0
-                    posture_pitch_target = 0.0
-
-                    # Clear all motion offsets
-                    for k in motion_offsets:
-                        motion_offsets[k] = 0.0
-
-                    # Re-enable balance
-                    disable_roll_pd = False
-
-                    # ----- END STOMP -----
-                    stomp_phase = "IDLE"
-                    stomp_active = False
-
-                    log_f.write("# EVENT_END %.3f\n" % time.time())
-                    log_f.flush()
-
-                    log_active = False
-                    print("[LOG] stomp capture complete")
-
-
-
-                    posture_roll_target = 0.0
-                    posture_pitch_target = 0.0
-
 
         # ==================================================
         # APPLY POSTURE BIAS (Layer-2)
@@ -2102,6 +1937,11 @@ while True:
                 manual_mode = False
 
                 fsm_state = "IDLE"
+        
+        # ---- Cancel pump on any motion ----
+        if step_active or fsm_state != "IDLE":
+            pump_active = False
+
 
                     
         # ==================================================
@@ -2222,7 +2062,15 @@ while True:
         
 
         for leg, ch in SHOULDERS.items():
-            applied_cmd = 0.0 if disable_roll_pd else roll_cmd
+            # -------- Asymmetric roll gain scheduling --------
+            gain = ROLL_GAIN_NEUTRAL
+            if step_active and swing_leg in LEG_SUPPORT_SHOULDERS:
+                if leg in LEG_SUPPORT_SHOULDERS[swing_leg]:
+                    gain = ROLL_GAIN_SUPPORT
+                else:
+                    gain = ROLL_GAIN_UNLOAD
+
+            applied_cmd = 0.0 if disable_roll_pd else gain * roll_cmd
             delta = applied_cmd - roll_offsets[leg]
             delta = max(-ROLL_STEP, min(ROLL_STEP, delta))
             if abs(delta) < 0.05:
@@ -2281,16 +2129,21 @@ while True:
 
             motion_offsets[leg] = max(-40.0, min(40.0, motion_offsets[leg]))
 
+            # ---------- Knee pump (action-level, symmetric) ----------
+            pump_offset = 0.0
+            if pump_active and not step_active and fsm_state == "IDLE":
+                pump_offset = knee_pump(time.time() - pump_start_time)
+
             angle = (
                 FOOT_STAND[leg]
                 + FOOT_SIGN[leg] * pitch_offsets[leg]
                 + motion_offsets[leg]
+                + pump_offset
                 + prop_target.get(leg, 0.0)
             )
 
+
             angle = max(FOOT_LIMITS[leg][0], min(FOOT_LIMITS[leg][1], angle))
-            if posture_mode == "SHOW" and show_motion == stomp:
-                angle = max(FOOT_LIMITS[leg][0]-10, min(FOOT_LIMITS[leg][1]+10, angle))
 
             set_servo_angle(ch, angle)
             servo_angles[ch] = angle
