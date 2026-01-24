@@ -28,6 +28,9 @@ SERVO_CHANNELS = {
 BASE_Z = -0.18
 ROLL_GAIN  = 0.005   # meters per degree
 PITCH_GAIN = 0.005
+X_FRONT_GAIN = 0.0015
+X_REAR_GAIN  = 0.0018   # stronger
+
 
 def posture_step():
     roll, pitch, _, _ = imu.update()
@@ -36,13 +39,17 @@ def posture_step():
     dz_right =  ROLL_GAIN * roll
     dz_front = -PITCH_GAIN * pitch
     dz_rear  =  PITCH_GAIN * pitch
+    dx_front =  X_FRONT_GAIN * pitch
+    dx_rear  = -X_REAR_GAIN  * pitch
 
     foot_targets = {
-        "FL": ( 0.15,  0.05, BASE_Z + dz_left  + dz_front),
-        "FR": ( 0.15, -0.05, BASE_Z + dz_right + dz_front),
-        "RR": (-0.15, -0.05, BASE_Z + dz_right + dz_rear),
-        "RL": (-0.15,  0.05, BASE_Z + dz_left  + dz_rear),
+        "FL": ( 0.15 + dx_front,  0.05, BASE_Z + dz_front),
+        "FR": ( 0.15 + dx_front, -0.05, BASE_Z + dz_front),
+        "RR": (-0.15 + dx_rear, -0.05, BASE_Z + dz_rear),
+        "RL": (-0.15 + dx_rear,  0.05, BASE_Z + dz_rear),
+
     }
+
 
     deltas = solve_all_legs(foot_targets)
     deltas = apply_joint_conventions(deltas)
