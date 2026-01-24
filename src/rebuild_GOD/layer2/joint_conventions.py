@@ -63,12 +63,14 @@ JOINT_SIGN = {
     "RR_THIGH": -1,   # RIGHT thighs: inverted
 
     # -----------------------------
-    # Wrist (later)
+    # Wrist (knee) — mirrored joints
     # -----------------------------
     "FL_WRIST": +1,
-    "FR_WRIST": +1,
-    "RL_WRIST": +1,
-    "RR_WRIST": +1,
+    "RL_WRIST": +1,   # LEFT wrists: as-is
+
+    "FR_WRIST": -1,
+    "RR_WRIST": -1,   # RIGHT wrists: invert
+
 }
 
 

@@ -70,21 +70,76 @@ STAND_FEET = {
 # Stand execution
 # -------------------------------------------------
 
-def stand():
+import time
+
+def stand_squat_test():
     """
-    Compute stand pose from geometry and command servos.
+    Layer 4 integration test:
+    Smooth stand → squat → stand
     """
-    # 1. IK — geometry → joint deltas
-    deltas = solve_all_legs(STAND_FEET)
-    deltas = apply_joint_conventions(deltas)
-    physical = normalize_all(deltas)
+
+    zs = [z * 0.001 for z in range(-180, -221, -2)]
+    zs += [z * 0.001 for z in range(-220, -179, 2)]
 
 
-    # 3. Command servos
-    for joint, angle in physical.items():
-        ch = SERVO_CHANNELS[joint]
-        set_servo_angle(ch, angle)
+    for z in zs:
+        foot_targets = {
+            "FL": ( 0.15,  0.05, z),
+            "FR": ( 0.15, -0.05, z),
+            "RR": (-0.15, -0.05, z),
+            "RL": (-0.15,  0.05, z),
+        }
 
+        deltas = solve_all_legs(foot_targets)
+        deltas = apply_joint_conventions(deltas)
+        physical = normalize_all(deltas)
+
+        for joint, angle in physical.items():
+            ch = SERVO_CHANNELS[joint]
+            set_servo_angle(ch, angle)
+
+        time.sleep(0.01)
+
+import time
+
+from hardware.absolute_truths import (
+    COXA_STAND,
+    THIGH_STAND,
+    WRIST_STAND,
+)
+
+def coxa_isolation_test():
+    ys = [y * 0.001 for y in range(30, 121, 5)]
+    ys += [y * 0.001 for y in range(120, 29, -5)]
+
+    for y in ys:
+        foot_targets = {
+            "FL": ( 0.15,  y, -0.18),
+            "FR": ( 0.15, -y, -0.18),
+            "RR": (-0.15, -y, -0.18),
+            "RL": (-0.15,  y, -0.18),
+        }
+
+        deltas = solve_all_legs(foot_targets)
+        deltas = apply_joint_conventions(deltas)
+        physical = normalize_all(deltas)
+
+        # 🔒 HARD OVERRIDE — ABSOLUTE ANGLES
+        physical["FL_THIGH"] = THIGH_STAND["TFL"]
+        physical["FR_THIGH"] = THIGH_STAND["TFR"]
+        physical["RL_THIGH"] = THIGH_STAND["TRL"]
+        physical["RR_THIGH"] = THIGH_STAND["TRR"]
+
+        physical["FL_WRIST"] = WRIST_STAND["WFL"]
+        physical["FR_WRIST"] = WRIST_STAND["WFR"]
+        physical["RL_WRIST"] = WRIST_STAND["WRL"]
+        physical["RR_WRIST"] = WRIST_STAND["WRR"]
+
+        for joint, angle in physical.items():
+            ch = SERVO_CHANNELS[joint]
+            set_servo_angle(ch, angle)
+
+        time.sleep(0.05)
 
 
 # -------------------------------------------------
@@ -92,5 +147,8 @@ def stand():
 # -------------------------------------------------
 
 if __name__ == "__main__":
-    print("[L4] Executing stand() — robot WILL MOVE")
-    stand()
+    #print("[L4] Running stand–squat integration test")
+    stand_squat_test()
+    print("[L4] coxa_isolation_test")
+    #coxa_isolation_test()
+
