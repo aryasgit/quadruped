@@ -58,7 +58,7 @@ def solve_leg_ik(x, y, z, side):
     if side == 'R':
         y = -y
 
-    COXA_GAIN = 50.0        # degrees per meter (safe)
+    COXA_GAIN = 120.0        # degrees per meter (safe)
     theta_coxa = COXA_GAIN * y
     theta_coxa = max(min(theta_coxa, 30.0), -30.0)
 
@@ -80,7 +80,7 @@ def solve_leg_ik(x, y, z, side):
     STAND_Z = -0.18
     dz = z - STAND_Z
 
-    THIGH_GAIN = 300.0   # deg per meter (now safe)
+    THIGH_GAIN = -220.0   # deg per meter (now safe)
     theta_thigh = THIGH_GAIN * dz
     theta_thigh = max(min(theta_thigh, 45.0), -45.0)
 
@@ -92,9 +92,16 @@ def solve_leg_ik(x, y, z, side):
     # -------------------------------------------------
     # WRIST — COMPLEMENT THIGH (TEMPORARY)
     # -------------------------------------------------
-    WRIST_GAIN = -0.8
-    theta_wrist = WRIST_GAIN * dz
-    theta_wrist = max(min(theta_wrist, 45.0), -45.0)
+    # -------------------------------------------------
+    # WRIST — KNEE COMPENSATION FOR VERTICAL MOTION
+    # -------------------------------------------------
+
+    # Wrist bends forward more than thigh bends back
+    WRIST_GAIN = -1.6    # stronger than thigh
+    theta_wrist = WRIST_GAIN * abs(theta_thigh)
+
+    theta_wrist = max(min(theta_wrist, 60.0), -60.0)
+
 
 
     return theta_coxa, theta_thigh, theta_wrist
