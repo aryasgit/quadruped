@@ -23,6 +23,10 @@ Coordinate convention (matches SpotMicro):
 
 import math
 
+L1 = 0.10832   # thigh length (meters)
+L2 = 0.13476   # foreleg length (meters)
+
+
 # -------------------------------------------------
 # Geometry constants (SpotMicro dimensions, meters)
 # -------------------------------------------------
@@ -37,59 +41,64 @@ L2 = 0.130  # Wrist / shin length
 # Core leg IK solver
 # -------------------------------------------------
 
-def solve_leg_ik(x: float, y: float, z: float, side: str):
+def solve_leg_ik(x, y, z, side):
     """
-    Solve inverse kinematics for a single leg.
+    Layer 3 — THIGH BRING-UP MODE
 
-    Inputs:
-        x, y, z : foot position relative to hip (meters)
-        side    : 'L' or 'R'
-
-    Returns:
-        (d_coxa, d_thigh, d_wrist) in DEGREES
-        These are DELTA angles relative to stand pose.
+    COXA  : lateral-only (already fixed)
+    THIGH : planar x–z IK
+    WRIST : locked at 0
     """
 
-    # Side correction (right legs mirror Y)
+    import math
+
+    # -------------------------------------------------
+    # COXA — LATERAL ONLY (already verified)
+    # -------------------------------------------------
     if side == 'R':
         y = -y
 
-    # ----------------------------
-    # Coxa (hip yaw)
-    # ----------------------------
-    theta_coxa = math.atan2(y, x)
+    COXA_GAIN = 50.0        # degrees per meter (safe)
+    theta_coxa = COXA_GAIN * y
+    theta_coxa = max(min(theta_coxa, 30.0), -30.0)
 
-    # Effective horizontal distance from hip after coxa
-    r = math.sqrt(x*x + y*y) - L0
+    # -------------------------------------------------
+    # THIGH — PLANAR IK (x–z)
+    # -------------------------------------------------
+    # Link lengths (meters)
+    L1 = 0.108   # thigh
+    L2 = 0.138   # shin (unused for now)
 
-    # Distance from hip joint to foot
-    d = math.sqrt(r*r + z*z)
+    # Effective reach in sagittal plane
+    r = math.sqrt(x*x + z*z)
 
-    # Safety clamp
-    d = max(min(d, L1 + L2 - 1e-6), abs(L1 - L2) + 1e-6)
+    # Safety clamp (geometry only)
+    r = max(min(r, L1 + L2 - 1e-3), abs(L1 - L2) + 1e-3)
 
-    # ----------------------------
-    # Knee (wrist)
-    # ----------------------------
-    cos_knee = (L1*L1 + L2*L2 - d*d) / (2 * L1 * L2)
-    theta_wrist = math.pi - math.acos(cos_knee)
+    # Thigh angle: point leg toward foot in x–z plane
+    # delta z from stand (positive = want to go down)
+    STAND_Z = -0.18
+    dz = z - STAND_Z
 
-    # ----------------------------
-    # Thigh (hip pitch)
-    # ----------------------------
-    alpha = math.atan2(z, r)
-    cos_beta = (L1*L1 + d*d - L2*L2) / (2 * L1 * d)
-    beta = math.acos(cos_beta)
-    theta_thigh = alpha + beta
+    THIGH_GAIN = 300.0   # deg per meter (now safe)
+    theta_thigh = THIGH_GAIN * dz
+    theta_thigh = max(min(theta_thigh, 45.0), -45.0)
 
-    # ----------------------------
-    # Convert to DEGREES
-    # ----------------------------
-    d_coxa  = math.degrees(theta_coxa)
-    d_thigh = math.degrees(theta_thigh)
-    d_wrist = math.degrees(theta_wrist)
 
-    return d_coxa, d_thigh, d_wrist
+
+    # -------------------------------------------------
+    # WRIST — LOCKED
+    # -------------------------------------------------
+    # -------------------------------------------------
+    # WRIST — COMPLEMENT THIGH (TEMPORARY)
+    # -------------------------------------------------
+    WRIST_GAIN = -0.8
+    theta_wrist = WRIST_GAIN * dz
+    theta_wrist = max(min(theta_wrist, 45.0), -45.0)
+
+
+    return theta_coxa, theta_thigh, theta_wrist
+
 
 
 # -------------------------------------------------
