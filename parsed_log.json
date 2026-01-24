@@ -1,0 +1,5044 @@
+{
+  "num_events": 1,
+  "events": [
+    {
+      "start": 0.0,
+      "end": 1768599980.284,
+      "duration": 1768599980.284,
+      "frames": [
+        {
+          "t": 1768599976.894,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.62,
+              "delta": -1.38,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.62,
+              "delta": -1.38,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.62,
+              "delta": -1.38,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.62,
+              "delta": -1.38,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 123.37,
+              "delta": -6.63,
+              "motion_cmd": -8.0,
+              "response": 0.397,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 67.63,
+              "delta": 6.63,
+              "motion_cmd": 8.0,
+              "response": 0.397,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 119.71,
+              "delta": -8.29,
+              "motion_cmd": -8.0,
+              "response": 0.397,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 87.45,
+              "delta": 10.45,
+              "motion_cmd": 8.0,
+              "response": 0.397,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 106.9,
+              "delta": 4.9,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 149.1,
+              "delta": -4.9,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599976.955,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.55,
+              "delta": -0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.55,
+              "delta": -0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.55,
+              "delta": -0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.55,
+              "delta": -0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 122.61,
+              "delta": -0.76,
+              "motion_cmd": -9.0,
+              "response": 0.236,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 68.39,
+              "delta": 0.76,
+              "motion_cmd": 9.0,
+              "response": 0.236,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 118.47,
+              "delta": -1.24,
+              "motion_cmd": -9.0,
+              "response": 0.236,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 88.69,
+              "delta": 1.24,
+              "motion_cmd": 9.0,
+              "response": 0.236,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 107.5,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 148.5,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.017,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.64,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.64,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.64,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.64,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 121.34,
+              "delta": -1.27,
+              "motion_cmd": -10.0,
+              "response": 0.265,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 69.66,
+              "delta": 1.27,
+              "motion_cmd": 10.0,
+              "response": 0.265,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 117.74,
+              "delta": -0.73,
+              "motion_cmd": -10.0,
+              "response": 0.265,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 89.42,
+              "delta": 0.73,
+              "motion_cmd": 10.0,
+              "response": 0.265,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 108.1,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 147.9,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.079,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 120.74,
+              "delta": -0.6,
+              "motion_cmd": -11.0,
+              "response": 0.397,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 70.26,
+              "delta": 0.6,
+              "motion_cmd": 11.0,
+              "response": 0.397,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 116.34,
+              "delta": -1.4,
+              "motion_cmd": -11.0,
+              "response": 0.397,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 90.82,
+              "delta": 1.4,
+              "motion_cmd": 11.0,
+              "response": 0.397,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 108.49,
+              "delta": 0.38,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 147.51,
+              "delta": -0.38,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.142,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 121.3,
+              "delta": 0.56,
+              "motion_cmd": -10.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 69.7,
+              "delta": -0.56,
+              "motion_cmd": 10.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 116.9,
+              "delta": 0.56,
+              "motion_cmd": -10.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 90.26,
+              "delta": -0.56,
+              "motion_cmd": 10.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 107.89,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 148.11,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.204,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 122.1,
+              "delta": 0.8,
+              "motion_cmd": -9.44,
+              "response": 0.197,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 68.9,
+              "delta": -0.8,
+              "motion_cmd": 9.44,
+              "response": 0.197,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 118.09,
+              "delta": 1.2,
+              "motion_cmd": -9.44,
+              "response": 0.197,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 89.07,
+              "delta": -1.2,
+              "motion_cmd": 9.44,
+              "response": 0.197,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 107.29,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 148.71,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.267,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.64,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 123.03,
+              "delta": 0.93,
+              "motion_cmd": -8.44,
+              "response": 0.073,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 67.97,
+              "delta": -0.93,
+              "motion_cmd": 8.44,
+              "response": 0.073,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 119.17,
+              "delta": 1.07,
+              "motion_cmd": -8.44,
+              "response": 0.073,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 87.99,
+              "delta": -1.07,
+              "motion_cmd": 8.44,
+              "response": 0.073,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 106.69,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 149.31,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.329,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.78,
+              "delta": 0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.78,
+              "delta": 0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.78,
+              "delta": 0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.78,
+              "delta": 0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 123.95,
+              "delta": 0.92,
+              "motion_cmd": -7.44,
+              "response": 0.08,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 67.05,
+              "delta": -0.92,
+              "motion_cmd": 7.44,
+              "response": 0.08,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 120.25,
+              "delta": 1.08,
+              "motion_cmd": -7.44,
+              "response": 0.08,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 86.91,
+              "delta": -1.08,
+              "motion_cmd": 7.44,
+              "response": 0.08,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 106.09,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 149.91,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.391,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.78,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.78,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.78,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.78,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 124.87,
+              "delta": 0.92,
+              "motion_cmd": -6.44,
+              "response": 0.077,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 66.13,
+              "delta": -0.92,
+              "motion_cmd": 6.44,
+              "response": 0.077,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 121.33,
+              "delta": 1.08,
+              "motion_cmd": -6.44,
+              "response": 0.077,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 85.83,
+              "delta": -1.08,
+              "motion_cmd": 6.44,
+              "response": 0.077,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 105.49,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 150.51,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.453,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.54,
+              "delta": -0.24,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.54,
+              "delta": -0.24,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.54,
+              "delta": -0.24,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.54,
+              "delta": -0.24,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 125.55,
+              "delta": 0.69,
+              "motion_cmd": -5.44,
+              "response": 0.314,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 65.45,
+              "delta": -0.69,
+              "motion_cmd": 5.44,
+              "response": 0.314,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 122.64,
+              "delta": 1.31,
+              "motion_cmd": -5.44,
+              "response": 0.314,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 84.52,
+              "delta": -1.31,
+              "motion_cmd": 5.44,
+              "response": 0.314,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 104.89,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 151.11,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.515,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.67,
+              "delta": 0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.67,
+              "delta": 0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.67,
+              "delta": 0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.67,
+              "delta": 0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 126.73,
+              "delta": 1.17,
+              "motion_cmd": -4.44,
+              "response": 0.174,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 64.27,
+              "delta": -1.17,
+              "motion_cmd": 4.44,
+              "response": 0.174,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 123.47,
+              "delta": 0.83,
+              "motion_cmd": -4.44,
+              "response": 0.174,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 83.69,
+              "delta": -0.83,
+              "motion_cmd": 4.44,
+              "response": 0.174,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 104.29,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 151.71,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.577,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.74,
+              "delta": 0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.74,
+              "delta": 0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.74,
+              "delta": 0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.74,
+              "delta": 0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 127.48,
+              "delta": 0.75,
+              "motion_cmd": -3.44,
+              "response": 0.249,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 63.52,
+              "delta": -0.75,
+              "motion_cmd": 3.44,
+              "response": 0.249,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 124.71,
+              "delta": 1.25,
+              "motion_cmd": -3.44,
+              "response": 0.249,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 82.45,
+              "delta": -1.25,
+              "motion_cmd": 3.44,
+              "response": 0.249,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 103.69,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 152.31,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.64,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.74,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.74,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.74,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.74,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 128.25,
+              "delta": 0.77,
+              "motion_cmd": -2.44,
+              "response": 0.229,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 62.75,
+              "delta": -0.77,
+              "motion_cmd": 2.44,
+              "response": 0.229,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 125.94,
+              "delta": 1.23,
+              "motion_cmd": -2.44,
+              "response": 0.229,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 81.22,
+              "delta": -1.23,
+              "motion_cmd": 2.44,
+              "response": 0.229,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 103.09,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 152.91,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.702,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.79,
+              "delta": 0.06,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.79,
+              "delta": 0.06,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.79,
+              "delta": 0.06,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.79,
+              "delta": 0.06,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 128.99,
+              "delta": 0.74,
+              "motion_cmd": -1.44,
+              "response": 0.263,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 62.01,
+              "delta": -0.74,
+              "motion_cmd": 1.44,
+              "response": 0.263,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 127.21,
+              "delta": 1.26,
+              "motion_cmd": -1.44,
+              "response": 0.263,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 79.95,
+              "delta": -1.26,
+              "motion_cmd": 1.44,
+              "response": 0.263,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 102.49,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 153.51,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.765,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.79,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.79,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.79,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.79,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 130.36,
+              "delta": 1.37,
+              "motion_cmd": -0.44,
+              "response": 0.368,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 60.64,
+              "delta": -1.37,
+              "motion_cmd": 0.44,
+              "response": 0.368,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 127.84,
+              "delta": 0.63,
+              "motion_cmd": -0.44,
+              "response": 0.368,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 79.32,
+              "delta": -0.63,
+              "motion_cmd": 0.44,
+              "response": 0.368,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 101.89,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 154.11,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.826,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.79,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.79,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.79,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.79,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 130.93,
+              "delta": 0.58,
+              "motion_cmd": 0.56,
+              "response": 0.424,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 60.07,
+              "delta": -0.58,
+              "motion_cmd": -0.56,
+              "response": 0.424,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 129.26,
+              "delta": 1.42,
+              "motion_cmd": 0.56,
+              "response": 0.424,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 77.9,
+              "delta": -1.42,
+              "motion_cmd": -0.56,
+              "response": 0.424,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 101.29,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 154.71,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.889,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.91,
+              "delta": 0.12,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.91,
+              "delta": 0.12,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.91,
+              "delta": 0.12,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.91,
+              "delta": 0.12,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 131.99,
+              "delta": 1.05,
+              "motion_cmd": 1.56,
+              "response": 0.054,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 59.01,
+              "delta": -1.05,
+              "motion_cmd": -1.56,
+              "response": 0.054,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 130.21,
+              "delta": 0.95,
+              "motion_cmd": 1.56,
+              "response": 0.054,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 76.95,
+              "delta": -0.95,
+              "motion_cmd": -1.56,
+              "response": 0.054,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 100.69,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 155.31,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599977.952,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.64,
+              "delta": -0.27,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.64,
+              "delta": -0.27,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.64,
+              "delta": -0.27,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.64,
+              "delta": -0.27,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 132.53,
+              "delta": 0.54,
+              "motion_cmd": 2.56,
+              "response": 0.456,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 58.47,
+              "delta": -0.54,
+              "motion_cmd": -2.56,
+              "response": 0.456,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 131.66,
+              "delta": 1.46,
+              "motion_cmd": 2.56,
+              "response": 0.456,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 75.5,
+              "delta": -1.46,
+              "motion_cmd": -2.56,
+              "response": 0.456,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 100.09,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 155.91,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.017,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.95,
+              "delta": 0.31,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.95,
+              "delta": 0.31,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.95,
+              "delta": 0.31,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.95,
+              "delta": 0.31,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 133.96,
+              "delta": 1.43,
+              "motion_cmd": 3.56,
+              "response": 0.43,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 57.04,
+              "delta": -1.43,
+              "motion_cmd": -3.56,
+              "response": 0.43,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 132.23,
+              "delta": 0.57,
+              "motion_cmd": 3.56,
+              "response": 0.43,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 74.93,
+              "delta": -0.57,
+              "motion_cmd": -3.56,
+              "response": 0.43,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 99.49,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 156.51,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.079,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.83,
+              "delta": -0.12,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.83,
+              "delta": -0.12,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.83,
+              "delta": -0.12,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.83,
+              "delta": -0.12,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 134.36,
+              "delta": 0.4,
+              "motion_cmd": 4.56,
+              "response": 0.602,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 56.64,
+              "delta": -0.4,
+              "motion_cmd": -4.56,
+              "response": 0.602,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 133.84,
+              "delta": 1.6,
+              "motion_cmd": 4.56,
+              "response": 0.602,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 73.32,
+              "delta": -1.6,
+              "motion_cmd": -4.56,
+              "response": 0.602,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 98.89,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 157.11,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.142,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.53,
+              "delta": -0.3,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.53,
+              "delta": -0.3,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.53,
+              "delta": -0.3,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.53,
+              "delta": -0.3,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 135.5,
+              "delta": 1.14,
+              "motion_cmd": 5.56,
+              "response": 0.138,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 55.5,
+              "delta": -1.14,
+              "motion_cmd": -5.56,
+              "response": 0.138,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 134.7,
+              "delta": 0.86,
+              "motion_cmd": 5.56,
+              "response": 0.138,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 72.46,
+              "delta": -0.86,
+              "motion_cmd": -5.56,
+              "response": 0.138,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 98.29,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 157.71,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.205,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.03,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.03,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.03,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.03,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 138.0,
+              "delta": 2.5,
+              "motion_cmd": 6.56,
+              "response": 1.5,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 53.0,
+              "delta": -2.5,
+              "motion_cmd": -6.56,
+              "response": 1.5,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 134.2,
+              "delta": -0.5,
+              "motion_cmd": 6.56,
+              "response": 1.5,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 72.96,
+              "delta": 0.5,
+              "motion_cmd": -6.56,
+              "response": 1.5,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 97.69,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 158.31,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.266,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 32.53,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 41.53,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 33.53,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 33.53,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 139.47,
+              "delta": 1.47,
+              "motion_cmd": 7.56,
+              "response": 0.472,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 51.53,
+              "delta": -1.47,
+              "motion_cmd": -7.56,
+              "response": 0.472,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 134.73,
+              "delta": 0.53,
+              "motion_cmd": 7.56,
+              "response": 0.472,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 72.43,
+              "delta": -0.53,
+              "motion_cmd": -7.56,
+              "response": 0.472,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 97.09,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 158.91,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.327,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 31.03,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 40.03,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 32.03,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 32.03,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 140.4,
+              "delta": 0.93,
+              "motion_cmd": 8.56,
+              "response": 0.07,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 50.6,
+              "delta": -0.93,
+              "motion_cmd": -8.56,
+              "response": 0.07,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 135.8,
+              "delta": 1.07,
+              "motion_cmd": 8.56,
+              "response": 0.07,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 71.36,
+              "delta": -1.07,
+              "motion_cmd": -8.56,
+              "response": 0.07,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 96.49,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 159.51,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.387,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 29.53,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 38.53,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 30.53,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 30.53,
+              "delta": -1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 141.31,
+              "delta": 0.91,
+              "motion_cmd": 9.56,
+              "response": 0.088,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 49.69,
+              "delta": -0.91,
+              "motion_cmd": -9.56,
+              "response": 0.088,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 136.88,
+              "delta": 1.09,
+              "motion_cmd": 9.56,
+              "response": 0.088,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 70.28,
+              "delta": -1.09,
+              "motion_cmd": -9.56,
+              "response": 0.088,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 96.72,
+              "delta": 0.24,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 159.28,
+              "delta": -0.24,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.447,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 28.88,
+              "delta": -0.65,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 37.88,
+              "delta": -0.65,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 29.88,
+              "delta": -0.65,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 29.88,
+              "delta": -0.65,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 139.87,
+              "delta": -1.44,
+              "motion_cmd": 8.56,
+              "response": 0.436,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 51.13,
+              "delta": 1.44,
+              "motion_cmd": -8.56,
+              "response": 0.436,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 136.32,
+              "delta": -0.56,
+              "motion_cmd": 8.56,
+              "response": 0.436,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 70.84,
+              "delta": 0.56,
+              "motion_cmd": -8.56,
+              "response": 0.436,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 97.32,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 158.68,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.507,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 30.38,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 39.38,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 31.38,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 31.38,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 137.37,
+              "delta": -2.5,
+              "motion_cmd": 7.56,
+              "response": 1.5,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 53.63,
+              "delta": 2.5,
+              "motion_cmd": -7.56,
+              "response": 1.5,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 136.82,
+              "delta": 0.5,
+              "motion_cmd": 7.56,
+              "response": 1.5,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 70.34,
+              "delta": -0.5,
+              "motion_cmd": -7.56,
+              "response": 1.5,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 97.92,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 158.08,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.567,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 31.88,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 40.88,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 32.88,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 32.88,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 136.37,
+              "delta": -1.0,
+              "motion_cmd": 6.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 54.63,
+              "delta": 1.0,
+              "motion_cmd": -6.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 135.82,
+              "delta": -1.0,
+              "motion_cmd": 6.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 71.34,
+              "delta": 1.0,
+              "motion_cmd": -6.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 98.52,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 157.48,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.627,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 33.38,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 42.38,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 34.38,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 34.38,
+              "delta": 1.5,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 135.26,
+              "delta": -1.11,
+              "motion_cmd": 5.56,
+              "response": 0.114,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 55.74,
+              "delta": 1.11,
+              "motion_cmd": -5.56,
+              "response": 0.114,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 134.93,
+              "delta": -0.89,
+              "motion_cmd": 5.56,
+              "response": 0.114,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 72.23,
+              "delta": 0.89,
+              "motion_cmd": -5.56,
+              "response": 0.114,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 99.12,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 156.88,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.687,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.82,
+              "delta": 1.44,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.82,
+              "delta": 1.44,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.82,
+              "delta": 1.44,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.82,
+              "delta": 1.44,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 134.54,
+              "delta": -0.72,
+              "motion_cmd": 4.56,
+              "response": 0.276,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 56.46,
+              "delta": 0.72,
+              "motion_cmd": -4.56,
+              "response": 0.276,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 133.66,
+              "delta": -1.28,
+              "motion_cmd": 4.56,
+              "response": 0.276,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 73.5,
+              "delta": 1.28,
+              "motion_cmd": -4.56,
+              "response": 0.276,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 99.72,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 156.28,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.747,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.43,
+              "delta": 0.61,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.43,
+              "delta": 0.61,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.43,
+              "delta": 0.61,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.43,
+              "delta": 0.61,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 133.54,
+              "delta": -1.0,
+              "motion_cmd": 3.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 57.46,
+              "delta": 1.0,
+              "motion_cmd": -3.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 132.66,
+              "delta": -1.0,
+              "motion_cmd": 3.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 74.5,
+              "delta": 1.0,
+              "motion_cmd": -3.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 100.32,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 155.68,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.808,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.27,
+              "delta": -0.16,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.27,
+              "delta": -0.16,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.27,
+              "delta": -0.16,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.27,
+              "delta": -0.16,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 132.69,
+              "delta": -0.84,
+              "motion_cmd": 2.56,
+              "response": 0.159,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 58.31,
+              "delta": 0.84,
+              "motion_cmd": -2.56,
+              "response": 0.159,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 131.5,
+              "delta": -1.16,
+              "motion_cmd": 2.56,
+              "response": 0.159,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 75.66,
+              "delta": 1.16,
+              "motion_cmd": -2.56,
+              "response": 0.159,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 100.92,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 155.08,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.871,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.77,
+              "delta": -0.49,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.77,
+              "delta": -0.49,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.77,
+              "delta": -0.49,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.77,
+              "delta": -0.49,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 131.69,
+              "delta": -1.0,
+              "motion_cmd": 1.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 59.31,
+              "delta": 1.0,
+              "motion_cmd": -1.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 130.5,
+              "delta": -1.0,
+              "motion_cmd": 1.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 76.66,
+              "delta": 1.0,
+              "motion_cmd": -1.56,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 101.52,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 154.48,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.932,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.1,
+              "delta": 0.32,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.1,
+              "delta": 0.32,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.1,
+              "delta": 0.32,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.1,
+              "delta": 0.32,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 130.56,
+              "delta": -1.13,
+              "motion_cmd": 0.56,
+              "response": 0.133,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 60.44,
+              "delta": 1.13,
+              "motion_cmd": -0.56,
+              "response": 0.133,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 129.63,
+              "delta": -0.87,
+              "motion_cmd": 0.56,
+              "response": 0.133,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 77.53,
+              "delta": 0.87,
+              "motion_cmd": -0.56,
+              "response": 0.133,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 102.12,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 153.88,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599978.995,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.24,
+              "delta": 0.15,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.24,
+              "delta": 0.15,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.24,
+              "delta": 0.15,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.24,
+              "delta": 0.15,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 130.04,
+              "delta": -0.52,
+              "motion_cmd": -0.44,
+              "response": 0.481,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 60.96,
+              "delta": 0.52,
+              "motion_cmd": 0.44,
+              "response": 0.481,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 128.15,
+              "delta": -1.48,
+              "motion_cmd": -0.44,
+              "response": 0.481,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 79.01,
+              "delta": 1.48,
+              "motion_cmd": 0.44,
+              "response": 0.481,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 102.72,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 153.28,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.057,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.13,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.13,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.13,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.13,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 129.04,
+              "delta": -1.0,
+              "motion_cmd": -1.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 61.96,
+              "delta": 1.0,
+              "motion_cmd": 1.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 127.15,
+              "delta": -1.0,
+              "motion_cmd": -1.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 80.01,
+              "delta": 1.0,
+              "motion_cmd": 1.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 103.32,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 152.68,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.119,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.13,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.13,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.13,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.13,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 128.24,
+              "delta": -0.81,
+              "motion_cmd": -2.44,
+              "response": 0.192,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 62.76,
+              "delta": 0.81,
+              "motion_cmd": 2.44,
+              "response": 0.192,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 125.96,
+              "delta": -1.19,
+              "motion_cmd": -2.44,
+              "response": 0.192,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 81.2,
+              "delta": 1.19,
+              "motion_cmd": 2.44,
+              "response": 0.192,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 103.92,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 152.08,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.181,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.13,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.13,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.13,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.13,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 127.04,
+              "delta": -1.2,
+              "motion_cmd": -3.44,
+              "response": 0.199,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 63.96,
+              "delta": 1.2,
+              "motion_cmd": 3.44,
+              "response": 0.199,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 125.16,
+              "delta": -0.8,
+              "motion_cmd": -3.44,
+              "response": 0.199,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 82.0,
+              "delta": 0.8,
+              "motion_cmd": 3.44,
+              "response": 0.199,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 104.52,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 151.48,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.245,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.0,
+              "delta": -0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.0,
+              "delta": -0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.0,
+              "delta": -0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.0,
+              "delta": -0.13,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 126.28,
+              "delta": -0.75,
+              "motion_cmd": -4.44,
+              "response": 0.247,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 64.72,
+              "delta": 0.75,
+              "motion_cmd": 4.44,
+              "response": 0.247,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 123.91,
+              "delta": -1.25,
+              "motion_cmd": -4.44,
+              "response": 0.247,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 83.25,
+              "delta": 1.25,
+              "motion_cmd": 4.44,
+              "response": 0.247,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 105.12,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 150.88,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.305,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 125.52,
+              "delta": -0.77,
+              "motion_cmd": -5.44,
+              "response": 0.233,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 65.48,
+              "delta": 0.77,
+              "motion_cmd": 5.44,
+              "response": 0.233,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 122.68,
+              "delta": -1.23,
+              "motion_cmd": -5.44,
+              "response": 0.233,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 84.48,
+              "delta": 1.23,
+              "motion_cmd": 5.44,
+              "response": 0.233,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 105.72,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 150.28,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.368,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.89,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.89,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.89,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.89,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 124.38,
+              "delta": -1.14,
+              "motion_cmd": -6.44,
+              "response": 0.136,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 66.62,
+              "delta": 1.14,
+              "motion_cmd": 6.44,
+              "response": 0.136,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 121.81,
+              "delta": -0.86,
+              "motion_cmd": -6.44,
+              "response": 0.136,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 85.35,
+              "delta": 0.86,
+              "motion_cmd": 6.44,
+              "response": 0.136,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 106.32,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 149.68,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.428,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.97,
+              "delta": 0.08,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.97,
+              "delta": 0.08,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.97,
+              "delta": 0.08,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.97,
+              "delta": 0.08,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 123.67,
+              "delta": -0.71,
+              "motion_cmd": -7.44,
+              "response": 0.289,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 67.33,
+              "delta": 0.71,
+              "motion_cmd": 7.44,
+              "response": 0.289,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 120.52,
+              "delta": -1.29,
+              "motion_cmd": -7.44,
+              "response": 0.289,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 86.64,
+              "delta": 1.29,
+              "motion_cmd": 7.44,
+              "response": 0.289,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 106.92,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 149.08,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.489,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.97,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.97,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.97,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.97,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 122.51,
+              "delta": -1.16,
+              "motion_cmd": -8.44,
+              "response": 0.162,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 68.49,
+              "delta": 1.16,
+              "motion_cmd": 8.44,
+              "response": 0.162,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 119.69,
+              "delta": -0.84,
+              "motion_cmd": -8.44,
+              "response": 0.162,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 87.47,
+              "delta": 0.84,
+              "motion_cmd": 8.44,
+              "response": 0.162,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 107.52,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 148.48,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.55,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.06,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.06,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.06,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.06,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 121.96,
+              "delta": -0.54,
+              "motion_cmd": -9.44,
+              "response": 0.455,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 69.04,
+              "delta": 0.54,
+              "motion_cmd": 9.44,
+              "response": 0.455,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 118.23,
+              "delta": -1.46,
+              "motion_cmd": -9.44,
+              "response": 0.455,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 88.93,
+              "delta": 1.46,
+              "motion_cmd": 9.44,
+              "response": 0.455,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 108.12,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 147.88,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.611,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.15,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.15,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.15,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.15,
+              "delta": 0.09,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 120.5,
+              "delta": -1.47,
+              "motion_cmd": -10.44,
+              "response": 0.468,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 70.5,
+              "delta": 1.47,
+              "motion_cmd": 10.44,
+              "response": 0.468,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 117.7,
+              "delta": -0.53,
+              "motion_cmd": -10.44,
+              "response": 0.468,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 89.46,
+              "delta": 0.53,
+              "motion_cmd": 10.44,
+              "response": 0.468,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 107.84,
+              "delta": -0.28,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 148.16,
+              "delta": 0.28,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.673,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.73,
+              "delta": -0.42,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.73,
+              "delta": -0.42,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.73,
+              "delta": -0.42,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.73,
+              "delta": -0.42,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 122.19,
+              "delta": 1.7,
+              "motion_cmd": -9.44,
+              "response": 0.698,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 68.81,
+              "delta": -1.7,
+              "motion_cmd": 9.44,
+              "response": 0.698,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 118.0,
+              "delta": 0.3,
+              "motion_cmd": -9.44,
+              "response": 0.698,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 89.16,
+              "delta": -0.3,
+              "motion_cmd": 9.44,
+              "response": 0.698,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 107.24,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 148.76,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.733,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.89,
+              "delta": 0.16,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.89,
+              "delta": 0.16,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.89,
+              "delta": 0.16,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.89,
+              "delta": 0.16,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 122.84,
+              "delta": 0.65,
+              "motion_cmd": -8.44,
+              "response": 0.351,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 68.16,
+              "delta": -0.65,
+              "motion_cmd": 8.44,
+              "response": 0.351,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 119.35,
+              "delta": 1.35,
+              "motion_cmd": -8.44,
+              "response": 0.351,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 87.81,
+              "delta": -1.35,
+              "motion_cmd": 8.44,
+              "response": 0.351,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 106.64,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 149.36,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.794,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.13,
+              "delta": 0.23,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.13,
+              "delta": 0.23,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.13,
+              "delta": 0.23,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.13,
+              "delta": 0.23,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 123.77,
+              "delta": 0.92,
+              "motion_cmd": -7.44,
+              "response": 0.076,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 67.23,
+              "delta": -0.92,
+              "motion_cmd": 7.44,
+              "response": 0.076,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 120.43,
+              "delta": 1.08,
+              "motion_cmd": -7.44,
+              "response": 0.076,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 86.73,
+              "delta": -1.08,
+              "motion_cmd": 7.44,
+              "response": 0.076,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 106.04,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 149.96,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.855,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.02,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.02,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.02,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.02,
+              "delta": -0.11,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 124.77,
+              "delta": 1.0,
+              "motion_cmd": -6.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 66.23,
+              "delta": -1.0,
+              "motion_cmd": 6.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 121.43,
+              "delta": 1.0,
+              "motion_cmd": -6.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 85.73,
+              "delta": -1.0,
+              "motion_cmd": 6.44,
+              "response": 0.0,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 105.44,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 150.56,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.917,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.02,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.02,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.02,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.02,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 125.14,
+              "delta": 0.38,
+              "motion_cmd": -5.44,
+              "response": 0.624,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 65.86,
+              "delta": -0.38,
+              "motion_cmd": 5.44,
+              "response": 0.624,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 123.05,
+              "delta": 1.62,
+              "motion_cmd": -5.44,
+              "response": 0.624,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 84.11,
+              "delta": -1.62,
+              "motion_cmd": 5.44,
+              "response": 0.624,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 104.84,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 151.16,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599979.978,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.92,
+              "delta": -0.1,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.92,
+              "delta": -0.1,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.92,
+              "delta": -0.1,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.92,
+              "delta": -0.1,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 126.6,
+              "delta": 1.45,
+              "motion_cmd": -4.44,
+              "response": 0.454,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 64.4,
+              "delta": -1.45,
+              "motion_cmd": 4.44,
+              "response": 0.454,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 123.6,
+              "delta": 0.55,
+              "motion_cmd": -4.44,
+              "response": 0.454,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 83.56,
+              "delta": -0.55,
+              "motion_cmd": 4.44,
+              "response": 0.454,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 104.24,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 151.76,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599980.038,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.07,
+              "delta": 0.15,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.07,
+              "delta": 0.15,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.07,
+              "delta": 0.15,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.07,
+              "delta": 0.15,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 127.43,
+              "delta": 0.84,
+              "motion_cmd": -3.44,
+              "response": 0.164,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 63.57,
+              "delta": -0.84,
+              "motion_cmd": 3.44,
+              "response": 0.164,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 124.76,
+              "delta": 1.16,
+              "motion_cmd": -3.44,
+              "response": 0.164,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 82.4,
+              "delta": -1.16,
+              "motion_cmd": 3.44,
+              "response": 0.164,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 103.64,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 152.36,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599980.098,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.15,
+              "delta": 0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.15,
+              "delta": 0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.15,
+              "delta": 0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.15,
+              "delta": 0.07,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 128.25,
+              "delta": 0.82,
+              "motion_cmd": -2.44,
+              "response": 0.178,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 62.75,
+              "delta": -0.82,
+              "motion_cmd": 2.44,
+              "response": 0.178,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 125.94,
+              "delta": 1.18,
+              "motion_cmd": -2.44,
+              "response": 0.178,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 81.22,
+              "delta": -1.18,
+              "motion_cmd": 2.44,
+              "response": 0.178,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 103.04,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 152.96,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599980.158,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.31,
+              "delta": 0.17,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.31,
+              "delta": 0.17,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.31,
+              "delta": 0.17,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.31,
+              "delta": 0.17,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 128.99,
+              "delta": 0.74,
+              "motion_cmd": -1.44,
+              "response": 0.263,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 62.01,
+              "delta": -0.74,
+              "motion_cmd": 1.44,
+              "response": 0.263,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 127.2,
+              "delta": 1.26,
+              "motion_cmd": -1.44,
+              "response": 0.263,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 79.96,
+              "delta": -1.26,
+              "motion_cmd": 1.44,
+              "response": 0.263,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 102.44,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 153.56,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599980.222,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 35.09,
+              "delta": -0.23,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 44.09,
+              "delta": -0.23,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 36.09,
+              "delta": -0.23,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 36.09,
+              "delta": -0.23,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 130.16,
+              "delta": 1.17,
+              "motion_cmd": -0.44,
+              "response": 0.167,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 60.84,
+              "delta": -1.17,
+              "motion_cmd": 0.44,
+              "response": 0.167,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 128.04,
+              "delta": 0.83,
+              "motion_cmd": -0.44,
+              "response": 0.167,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 79.12,
+              "delta": -0.83,
+              "motion_cmd": 0.44,
+              "response": 0.167,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 101.84,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 154.16,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        },
+        {
+          "t": 1768599980.284,
+          "joints": {
+            "SHOULDER_FR": {
+              "angle": 34.91,
+              "delta": -0.18,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_FL": {
+              "angle": 43.91,
+              "delta": -0.18,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RR": {
+              "angle": 35.91,
+              "delta": -0.18,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "SHOULDER_RL": {
+              "angle": 35.91,
+              "delta": -0.18,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "FOOT_FRF": {
+              "angle": 130.99,
+              "delta": 0.83,
+              "motion_cmd": 0.56,
+              "response": 0.166,
+              "contact": 1.0
+            },
+            "FOOT_FLF": {
+              "angle": 60.01,
+              "delta": -0.83,
+              "motion_cmd": -0.56,
+              "response": 0.166,
+              "contact": 1.0
+            },
+            "FOOT_RRF": {
+              "angle": 129.2,
+              "delta": 1.17,
+              "motion_cmd": 0.56,
+              "response": 0.166,
+              "contact": 1.0
+            },
+            "FOOT_RLF": {
+              "angle": 77.96,
+              "delta": -1.17,
+              "motion_cmd": -0.56,
+              "response": 0.166,
+              "contact": 1.0
+            },
+            "MID_FRM": {
+              "angle": 104.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_FLM": {
+              "angle": 165.0,
+              "delta": 0.0,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RRM": {
+              "angle": 101.24,
+              "delta": -0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            },
+            "MID_RLM": {
+              "angle": 154.76,
+              "delta": 0.6,
+              "motion_cmd": 0.0,
+              "response": 0.0,
+              "contact": 0.0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "summary": [
+    {
+      "event": 0,
+      "duration": 1768599980.284,
+      "max_angles": {
+        "SHOULDER_FR": 35.95,
+        "SHOULDER_FL": 44.95,
+        "SHOULDER_RR": 36.95,
+        "SHOULDER_RL": 36.95,
+        "FOOT_FRF": 141.31,
+        "FOOT_FLF": 70.5,
+        "FOOT_RRF": 136.88,
+        "FOOT_RLF": 90.82,
+        "MID_FRM": 104.0,
+        "MID_FLM": 165.0,
+        "MID_RRM": 108.49,
+        "MID_RLM": 159.51
+      },
+      "min_angles": {
+        "SHOULDER_FR": 28.88,
+        "SHOULDER_FL": 37.88,
+        "SHOULDER_RR": 29.88,
+        "SHOULDER_RL": 29.88,
+        "FOOT_FRF": 120.5,
+        "FOOT_FLF": 49.69,
+        "FOOT_RRF": 116.34,
+        "FOOT_RLF": 70.28,
+        "MID_FRM": 104.0,
+        "MID_FLM": 165.0,
+        "MID_RRM": 96.49,
+        "MID_RLM": 147.51
+      },
+      "avg_contact": {
+        "SHOULDER_FR": 0.0,
+        "SHOULDER_FL": 0.0,
+        "SHOULDER_RR": 0.0,
+        "SHOULDER_RL": 0.0,
+        "FOOT_FRF": 1.0,
+        "FOOT_FLF": 1.0,
+        "FOOT_RRF": 1.0,
+        "FOOT_RLF": 1.0,
+        "MID_FRM": 0.0,
+        "MID_FLM": 0.0,
+        "MID_RRM": 0.0,
+        "MID_RLM": 0.0
+      }
+    }
+  ]
+}
