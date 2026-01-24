@@ -11,7 +11,7 @@ import tkinter as tk
 from collections import deque
 import multiprocessing as mp
 from plotter_process import plotter_main
-from telemetry_pub import telemetry_publisher
+mp.set_start_method("fork", force=True)
 
 
 # ==================================================
@@ -37,7 +37,7 @@ PRESCALE = 0xFE
 CONFIG = 0x1A
 GYRO_CONFIG = 0x1B
 ACCEL_CONFIG = 0x1C
-
+teach_mode = False   # 🖐 torque-free kinesthetic teaching
 # ==================================================
 # SERVO CONFIG (MECHANICAL LIMITS)
 # ==================================================
@@ -129,6 +129,18 @@ FOOT_SIGN = {
 # Mechanical safety limits — PREVENT DAMAGE
 FOOT_LIMITS = {k: (0, 190) for k in FEET}
 
+# Which shoulders primarily support which foot
+LEG_SUPPORT_SHOULDERS = {
+    "FRF": ("FL", "RL"),   # support diagonally opposite
+    "FLF": ("FR", "RR"),
+    "RRF": ("FL", "RL"),
+    "RLF": ("FR", "RR"),
+}
+
+ROLL_GAIN_SUPPORT = 1.25     # stronger support reaction
+ROLL_GAIN_UNLOAD  = 0.55     # soften swing side
+ROLL_GAIN_NEUTRAL = 1.0
+
 # ==================================================
 # CONTROL PARAMETERS (THIS IS WHERE YOU TUNE)
 # ==================================================
@@ -177,6 +189,27 @@ last_printed_contact = 1.0
 CONTACT_PRINT_EPS = 0.08   # print only on meaningful change
 
 # ==================================================
+# AIRBORNE DETECTION STATE
+# ==================================================
+airborne_conf = 0.0          # 0.0 = grounded, 1.0 = airborne
+robot_airborne = False
+
+# Gravity unload threshold (raw accel units)
+GRAVITY_NOMINAL = 16384
+GRAVITY_LOSS_THRESH = 2600   # ~0.15g drop (slow lift)
+
+AIRBORNE_RISE = 0.18         # how fast airborne confidence rises
+AIRBORNE_FALL = 0.10         # how fast it decays
+# Slow lift detection (quasi-static)
+SLOW_LIFT_RISE = 0.06      # slow confidence rise
+SLOW_LIFT_FALL = 0.04
+SLOW_LIFT_CONTACT_MAX = 0.45
+SLOW_LIFT_EFFORT_MAX = 0.08
+
+
+
+
+# ==================================================
 # STEP PRIMITIVE (SEALED)
 # A STEP consists of:
 # UNLOADING → LIFTING → DONE → RECENTERING → CONTACT → IDLE
@@ -186,11 +219,25 @@ CONTACT_PRINT_EPS = 0.08   # print only on meaningful change
 
 step_active = False
 
+manual_leg = None      # GUI-selected leg only
+manual_mode = False   # True = GUI controls FSM
+
+
 # ==================================================
 # GAIT SEQUENCER (SAFE, EVENT-DRIVEN)
 # ==================================================
 
 GAIT_SEQUENCE = ["FRF", "RLF", "FLF", "RRF"]  # crawl gait (diagonal support)
+# ==================================================
+# DIAGONAL LEG PAIRS (AUTHORITATIVE)
+# ==================================================
+DIAGONAL_PAIRS = {
+    "FLF": "RRF",
+    "RRF": "FLF",
+    "FRF": "RLF",
+    "RLF": "FRF",
+}
+
 FRONT_LEGS = ("FRF", "FLF")
 REAR_LEGS  = ("RRF", "RLF")
 
@@ -200,6 +247,10 @@ gait_index = 0
 
 STOP_HOLD_TIME = 1.5   # seconds
 stop_hold_until = 0.0
+
+show_motion = None   # default
+
+
 
 # ==================================================
 # MICRO PROPULSION (STANCE PUSH) — OPTION 1
@@ -226,6 +277,10 @@ POSTURE_ID = {
     "LEAN_BACK": 4,
     "SIT": 5,
     "KNEEL": 6,
+    "SHOW": 7,
+    "REAR_LIFT": 8,
+    "HI": 8,
+
 }
 
 # ==================================================
@@ -237,7 +292,7 @@ def request_step(leg):
     This is the ONLY allowed way to initiate unload + lift.
     Returns True if accepted, False if rejected.
     """
-    global swing_leg, step_active
+    global swing_legs, step_active
 
     # Reject invalid legs
     if leg not in FEET:
@@ -248,8 +303,10 @@ def request_step(leg):
         return False
 
     # Arm step
-    swing_leg = leg
-    step_active = True
+    pair = [leg, DIAGONAL_PAIRS[leg]]
+    swing_legs = pair
+    #step_active = True
+
 
     return True
 
@@ -281,6 +338,9 @@ LOG_ENABLE = True
 LOG_DT = 0.05           # log at control rate (20 Hz)
 LOG_FILE = "run_log.csv"
 last_log_time = 0.0
+log_active = False        # 👈 MASTER GATE
+log_start_time = 0.0
+
 
 SERVO_DELTA_GROUND = 0.15   # deg → constrained
 SERVO_DELTA_AIR    = 0.6    # deg → free
@@ -288,10 +348,13 @@ SERVO_DELTA_AIR    = 0.6    # deg → free
 if LOG_ENABLE:
     log_f = open(LOG_FILE, "w")
     log_f.write(
-        "t,roll,pitch,"
+        "t,"
+        "joint,servo_angle,servo_delta,"
+        "motion_cmd,leg_response,foot_contact,"
+        "roll,pitch,"
         "posture_roll,posture_pitch,"
         "roll_effort,offset_change,"
-        "fsm,swing,brace\n"
+        "posture_mode,fsm\n"
     )
     log_f.flush()
     
@@ -341,10 +404,27 @@ MID_LIMBS = {
     2: 102,   # RRM
     3: 154,   # RLM
 }
+# Mid-limb direction signs (mirror rule)
+# Right side = +1, Left side = -1
+MID_SIGN = {
+    8: +1,   # FRM (front right mid)
+    9: -1,   # FLM (front left mid)
+    2: +1,   # RRM (rear right mid)
+    3: -1,   # RLM (rear left mid)
+}
+
+
+# Rear mid-limb channels only
+REAR_MID_LIMBS = {
+    2: MID_LIMBS[2],   # RRM
+    3: MID_LIMBS[3],   # RLM
+}
+
 
 for ch, angle in MID_LIMBS.items():
-    set_servo_angle(ch, angle)
-    servo_angles[ch] = angle
+    if not teach_mode:
+        set_servo_angle(ch, angle)
+        servo_angles[ch] = angle
     time.sleep(0.02)
     
 # ==================================================
@@ -397,8 +477,10 @@ gx_o /= 200; gy_o /= 200
 # ==================================================
 # CONTROL STATE VARIABLES
 # ==================================================
+
 roll = 0.0
 pitch = 0.0
+posture_locked = False
 
 STAND_ROLL_REF = None
 STAND_PITCH_REF = None
@@ -428,18 +510,52 @@ plot_proc = mp.Process(
 )
 plot_proc.start()
 print("[PLOT] plotter process started")
-telem_proc = mp.Process(
-    target=telemetry_publisher,
-    args=(telemetry_q, 5555),
-    daemon=True
-)
-telem_proc.start()
-print("[TELEM] remote telemetry started")
+# ---- REMOTE TELEMETRY DISABLED ----
+# telem_proc = mp.Process(
+#     target=telemetry_publisher,
+#     args=(telemetry_q, 5555),
+#     daemon=True
+# )
+# telem_proc.start()
+# print("[TELEM] remote telemetry started")
+
 
 
 # ===============================
 # LAYER-2: POSTURE / MOTION STATE
 # ===============================
+# ==================================================
+# SHOW MODE (CROWD DEMO)
+# ==================================================
+show_active = False
+show_start_time = 0.0
+
+# ==================================================
+# GLOBAL ACTION: KNEE PUMP (SAFE, SYMMETRIC)
+# ==================================================
+pump_active = False
+pump_start_time = 0.0
+
+PUMP_FREQ = 0.6        # Hz (slow, dog-like)
+PUMP_AMP  = 10.0       # degrees (SAFE: 6–12)
+
+# ==================================================
+# HI POSTURE (FRONT-LEFT FOOT WAVE)
+# ==================================================
+HI_FREQ = 0.6            # Hz (friendly, visible)
+HI_FOOT_MIN = 20.0       # deg (down)
+HI_FOOT_MAX = 60.0       # deg (up)
+HI_UNLOAD_ROLL = +20.0
+HI_UNLOAD_PITCH = -10.0
+
+# ==================================================
+# REAR MID-LIMB LIFT + FOOT DROP (CONTINUOUS)
+# ==================================================
+REAR_LIFT_FREQ = 0.4      # Hz (slow, stable)
+REAR_MID_AMP   = 10.0     # degrees (SAFE)
+FOOT_DROP_AMP  = 20.0     # degrees (SAFE)
+
+
 # ==================================================
 # POSTURE MODES (HIGH-LEVEL INTENT)
 # ==================================================
@@ -555,6 +671,84 @@ def ramp(current, target, step):
 # ==================================================
 # POSTURE MODE RESOLVER (SAFE, COMPOSABLE)
 # ==================================================
+# ==================================================
+# SHOW MOTION PRIMITIVES (VISUAL, CROWD MODE)
+# ==================================================
+
+def sway(t):
+    """
+    Left-right body sway with knee pumping.
+    Dramatic, safe, visually expressive.
+    """
+    roll  = SHOW_ROLL_AMP * math.sin(2 * math.pi * SHOW_FREQ_SWAY * t)
+    pitch = -SHOW_PITCH_AMP * abs(
+        math.sin(2 * math.pi * SHOW_FREQ_SQUAT * t)
+    )
+
+    knee = SHOW_KNEE_AMP * math.sin(2 * math.pi * SHOW_FREQ_SWAY * t)
+
+    return roll, pitch, knee
+
+def knee_pump(t):
+    """
+    Symmetric knee pump.
+    All feet move together (no unloading).
+    """
+    return PUMP_AMP * math.sin(2 * math.pi * PUMP_FREQ * t)
+
+def rear_lift_wave(t):
+    """
+    Continuous rear mid-limb lift + foot drop.
+    Rear mid-limbs lift upward.
+    All feet lower symmetrically.
+    """
+    phase = math.sin(2 * math.pi * REAR_LIFT_FREQ * t)
+
+    mid_offset = REAR_MID_AMP * phase
+    foot_offset = -FOOT_DROP_AMP * phase   # negative = drop
+
+    return mid_offset, foot_offset
+
+def hi_wave(t):
+    """
+    Front-left foot waving motion.
+    Oscillates between HI_FOOT_MIN and HI_FOOT_MAX.
+    """
+    phase = 0.5 * (1 + math.sin(2 * math.pi * HI_FREQ * t))
+    return HI_FOOT_MIN + phase * (HI_FOOT_MAX - HI_FOOT_MIN)
+
+def capture_current_posture(name):
+    posture = {
+        "shoulders": {},
+        "feet": {},
+        "midlimbs": {},
+    }
+
+    # Shoulders
+    for leg, ch in SHOULDERS.items():
+        posture["shoulders"][leg] = (
+            servo_angles.get(ch, SHOULDER_STAND[leg])
+            - SHOULDER_STAND[leg]
+        )
+
+    # Feet
+    for leg, ch in FEET.items():
+        posture["feet"][leg] = (
+            servo_angles.get(ch, FOOT_STAND[leg])
+            - FOOT_STAND[leg]
+        )
+
+    # Mid-limbs
+    for ch, base in MID_LIMBS.items():
+        posture["midlimbs"][ch] = servo_angles.get(ch, base) - base
+
+    POSTURE_TARGETS[name] = posture
+    print(f"[CAPTURED POSTURE] {name}")
+
+
+
+
+
 def apply_posture_mode():
     global posture_roll_target, posture_pitch_target
 
@@ -617,6 +811,102 @@ def apply_posture_mode():
         # 🔥 Mid-limbs (NEW)
         for ch, val in tgt["midlimbs"].items():
             mid_offsets[ch] = ramp(mid_offsets[ch], val, MID_RECENTER_STEP)
+    
+    elif posture_mode == "REAR_LIFT":
+        t = time.time() - last_posture_change_time
+
+        mid_delta, foot_delta = rear_lift_wave(t)
+
+        # ---- Rear mid-limbs only ----
+        for ch in REAR_MID_LIMBS:
+            mid_offsets[ch] = ramp(
+                mid_offsets[ch],
+                MID_SIGN[ch] * mid_delta,
+                MID_RECENTER_STEP
+            )
+
+
+        # ---- All feet ----
+        for leg in FEET:
+            motion_offsets[leg] = ramp(
+                motion_offsets[leg],
+                FOOT_SIGN[leg] * foot_delta,
+                1.0
+            )
+
+
+        posture_roll_target  = 0.0
+        posture_pitch_target = 0.0
+
+    elif posture_mode == "HI":
+        # ❌ Do not allow during step
+        if step_active or fsm_state != "IDLE":
+            return
+
+        t = time.time() - last_posture_change_time
+
+        # --- Geometric unload (NO BODY ROLL) ---
+        # Reuse authoritative unload map
+        for shoulder, val in UNLOAD_SHOULDER_OFFSETS["FLF"].items():
+            motion_offsets[shoulder] = ramp(
+                motion_offsets[shoulder],
+                SHOULDER_SIGN[shoulder] * val,
+                1.2
+            )
+
+
+        # --- 2) Wave FLF only ---
+        target_angle = hi_wave(t)
+
+        # Convert absolute target → motion offset
+        # motion_offsets are RELATIVE to FOOT_STAND
+        motion_offsets["FLF"] = ramp(
+            motion_offsets["FLF"],
+            target_angle - FOOT_STAND["FLF"],
+            1.2
+        )
+
+        # --- 3) Freeze other feet ---
+        # Keep other feet neutral
+        for leg in FEET:
+            if leg != "FLF":
+                motion_offsets[leg] = ramp(
+                    motion_offsets[leg],
+                    0.0,
+                    0.8
+                )
+
+        # No posture bias
+        posture_roll_target  = 0.0
+        posture_pitch_target = 0.0
+
+
+    elif posture_mode == "SHOW":
+        # SHOW mode is currently limited to safe upper-body motion only
+        if show_motion is None:
+            posture_roll_target  = 0.0
+            posture_pitch_target = 0.0
+            return
+
+        t = time.time() - show_start_time
+        # New sway does NOT affect posture
+        posture_roll_target  = 0.0
+        posture_pitch_target = 0.0
+
+
+        # HARD SAFETY: SHOW must never command knees
+        for leg in FEET:
+            motion_offsets[leg] = ramp(
+                motion_offsets[leg],
+                0.0,
+                0.8
+            )
+
+
+
+
+
+
 
 
 
@@ -692,22 +982,22 @@ UNLOAD_SHOULDER_OFFSETS = {
     },
     # Lifting REAR RIGHT foot
     "RRF": {
-        "FR": +7.0,
-        "FL": +7.0,
+        "FR": +10.0,
+        "FL": +10.0,
         "RL": -15.0,
         "RR":  0.0,
     },
     # Lifting REAR LEFT foot
     "RLF": {
-        "FR": +5.0,
-        "FL": +5.0,
+        "FR": +9.0,
+        "FL": +9.0,
         "RR": -10.0,
         "RL":  0.0,
     },
 }
 
 # FSM for simple unload + lift of a single leg (start disabled)
-swing_leg = None        # e.g. "FRF" when commanded
+swing_legs = []        # e.g. "FRF" when commanded
 fsm_state = "IDLE"      # IDLE / UNLOADING / LIFTING / DONE
 disable_roll_pd = False
 
@@ -718,8 +1008,8 @@ gui_selected_leg = None      # "FRF", "FLF", "RRF", "RLF"
 gui_enabled = False
 
 # LIFT parameters
-LIFT_HEIGHT = 15.0      # deg (knee flex offset as motion)
-LIFT_STEP = 0.8         # deg per cycle for knee motion
+LIFT_HEIGHT = 20.0      # deg (knee flex offset as motion)
+LIFT_STEP = 1        # deg per cycle for knee motion
 UNLOAD_SETTLE_THRESH = 1.0  # deg — how close IMU must be to posture bias
 
 # ==================================================
@@ -729,6 +1019,9 @@ BRACE_ACCEL_THRESHOLD = 3000     # raw accel delta
 BRACE_DURATION = 0.25            # seconds
 BRACE_GAIN_SCALE = 0.6           # soften controller
 BRACE_MAX_BIAS = 12.0            # deg (keep small)
+BRACE_GAIN_PITCH = 0.45   # forward/back (less trusted)
+BRACE_GAIN_ROLL  = 1.0    # left/right (fully trusted)
+
 
 brace_active = False
 brace_until = 0.0
@@ -793,6 +1086,12 @@ def start_unified_gui():
     CYBER_TEXT = "#e6e6e6"
     CYBER_MUTED = "#9a9a9a"
 
+    def set_sway():
+        global show_motion, posture_mode, show_start_time
+        posture_mode = "SHOW"
+        show_motion = sway
+        show_start_time = time.time()
+
     global gui_selected_leg
 
     root = tk.Tk()
@@ -831,11 +1130,47 @@ def start_unified_gui():
     main = tk.Frame(root, bg="#0b0b0b")
     main.pack(fill="both", expand=True, padx=8, pady=8)
 
-    left  = tk.Frame(main, bg="#151515", width=300)
-    right = tk.Frame(main, bg="#151515")
+    # ================= LEFT SCROLLABLE PANEL =================
+    left_container = tk.Frame(main, bg="#151515", width=320)
+    left_container.pack(side="left", fill="y", padx=(0, 8))
 
-    left.pack(side="left", fill="y", padx=(0, 8))
+    left_canvas = tk.Canvas(
+        left_container,
+        bg="#151515",
+        highlightthickness=0,
+        width=200
+    )
+    left_canvas.pack(side="left", fill="both", expand=True)
+
+    left_scroll = tk.Scrollbar(
+        left_container,
+        orient="vertical",
+        command=left_canvas.yview
+    )
+    left_scroll.pack(side="right", fill="y")
+
+    left_canvas.configure(yscrollcommand=left_scroll.set)
+
+    # 👇 THIS replaces your old `left` frame
+    left = tk.Frame(left_canvas, bg="#151515")
+    left_canvas.create_window((0, 0), window=left, anchor="nw")
+
+    # Auto-update scroll region
+    def _on_left_configure(event):
+        left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+
+    left.bind("<Configure>", _on_left_configure)
+
+    # Mouse wheel support
+    def _on_mousewheel(event):
+        left_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    left_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+    # ================= RIGHT PANEL (UNCHANGED) =================
+    right = tk.Frame(main, bg="#151515")
     right.pack(side="right", fill="both", expand=True)
+
 
     # ==================================================
     # LEFT PANEL — CONTROLS + RAW STATE
@@ -879,6 +1214,130 @@ def start_unified_gui():
 
     tk.Button(left, text="KNEEL", command=lambda: set_posture("KNEEL"),
             bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=2)
+    
+    def start_show():
+        posture_mode = "SHOW"
+        show_motion = sway
+
+    tk.Button(
+        left,
+        text="✨ SHOW MODE",
+        command=start_show,
+        bg="#ff2ec4",
+        fg="#000000",
+        relief="flat",
+        font=FONT_HDR
+    ).pack(fill="x", padx=10, pady=(8,4))
+
+    def start_pump():
+        global pump_active, pump_start_time
+        if step_active or fsm_state != "IDLE":
+            return
+        pump_active = True
+        pump_start_time = time.time()
+
+    def stop_pump():
+        global pump_active
+        pump_active = False
+
+    tk.Button(
+        left, text="🐕 SWAY",
+        command=start_pump,
+        bg="#224422", fg="#ccffcc",
+        relief="flat", font=FONT_HDR
+    ).pack(fill="x", padx=10, pady=4)
+
+    tk.Button(
+        left, text="STOP SWAY",
+        command=stop_pump,
+        bg="#222222", fg="#e6e6e6",
+        relief="flat"
+    ).pack(fill="x", padx=10, pady=2)
+
+
+    tk.Label(left, text="SHOW MOTIONS", font=FONT_HDR,
+         fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(6,2))
+
+    tk.Button(left, text="IGNORE",
+            command=set_sway,
+            bg="#222222", fg="#e6e6e6",
+            relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=2)
+    
+    tk.Button(
+        left, text="PUMP UP DOWN",
+        command=lambda: set_posture("REAR_LIFT"),
+        bg="#333333", fg="#ffffff",
+        relief="flat"
+    ).pack(fill="x", padx=10, pady=2)
+
+    tk.Button(
+        left, text="👋 HI",
+        command=lambda: set_posture("HI"),
+        bg="#333333", fg="#ffffff",
+        relief="flat"
+    ).pack(fill="x", padx=10, pady=2)
+
+    def toggle_teach():
+        global teach_mode
+        teach_mode = not teach_mode
+        print("[TEACH MODE]", "ON" if teach_mode else "OFF")
+
+    tk.Button(
+        left,
+        text="🖐 TEACH MODE",
+        command=toggle_teach,
+        bg="#444444",
+        fg="#ffffff",
+        relief="flat",
+        font=FONT_HDR
+    ).pack(fill="x", padx=10, pady=(12,4))
+
+    tk.Button(
+        left,
+        text="📸 CAPTURE POSTURE",
+        command=lambda: capture_current_posture("CUSTOM_1"),
+        bg="#224466",
+        fg="#ffffff",
+        relief="flat"
+    ).pack(fill="x", padx=10, pady=2)
+
+
+
+
+
+    # ---------------- LOG CONTROL ----------------
+    tk.Label(left, text="LOGGING", font=FONT_HDR,
+            fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(10,2))
+
+    def start_log():
+        global log_active, log_start_time
+        log_active = True
+        log_start_time = time.time()
+        log_f.write("# EVENT_START %.3f\n" % time.time())
+        log_f.flush()                     
+        print("[LOG] started")
+
+
+    def stop_log():
+        global log_active
+        log_active = False
+        log_f.write("# EVENT_END %.3f\n" % time.time())
+        log_f.flush()                 
+        print("[LOG] stopped")
+
+
+    tk.Button(left, text="▶ START LOG",
+            command=start_log,
+            bg="#004400", fg="#ccffcc",
+            relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=2)
+
+    tk.Button(left, text="■ STOP LOG",
+            command=stop_log,
+            bg="#440000", fg="#ffcccc",
+            relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=(0,4))
+
+
+
 
     selected_leg_var = tk.StringVar(value="None")
 
@@ -900,13 +1359,14 @@ def start_unified_gui():
 
 
     def select_leg(leg):
-        global gui_selected_leg
-        accepted = request_step(leg)
-        if accepted:
-            gui_selected_leg = leg
-            selected_leg_var.set(leg)
-        else:
+        global manual_leg, manual_mode
+        if step_active or fsm_state != "IDLE":
             selected_leg_var.set("BUSY")
+            return
+
+        manual_leg = leg
+        manual_mode = True
+        selected_leg_var.set(leg)
 
     for leg in ["FRF", "FLF", "RRF", "RLF"]:
         tk.Button(
@@ -923,16 +1383,43 @@ def start_unified_gui():
     tk.Label(left, textvariable=selected_leg_var, font=FONT_MONO, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10)
 
     def lift():
-        pass
+        global swing_legs, step_active, fsm_state
+        global posture_locked, disable_roll_pd, unload_start
+
+        if manual_leg is None:
+            return
+        if fsm_state != "IDLE":
+            return
+
+        pair = [manual_leg, DIAGONAL_PAIRS[manual_leg]]
+        swing_legs = pair
+        posture_locked = True
+        manual_mode = True
+
+        primary_leg = swing_legs[0]
+        posture_roll_target  = UNLOAD_POSTURE[primary_leg]["roll"]
+        posture_pitch_target = UNLOAD_POSTURE[primary_leg]["pitch"]
+
+        disable_roll_pd = True
+        unload_start = time.time()
         
     def lower():
-        pass
+        global fsm_state
+
+        if not manual_mode:
+            return
+        if fsm_state not in ("LIFTING",):
+            return
+
+        fsm_state = "RECENTERING"
+
 
     tk.Button(left, text="LIFT", command=lift, bg="#333333", fg="#ffffff", relief="flat", font=FONT_HDR).pack(fill="x", padx=10, pady=(12, 4))
     tk.Button(left, text="LOWER", command=lower, bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=4)
     
     def start_gait():
-        global gait_enabled
+        global gait_enabled, posture_mode
+        posture_mode = "STAND" 
         motion_armed = True
         gait_enabled = True
 
@@ -1129,6 +1616,31 @@ def start_unified_gui():
     )
     stab_val.pack(anchor="e", padx=10)
 
+    # ---------------- Airborne Confidence ----------------
+    tk.Label(
+        right,
+        text="AIRBORNE CONFIDENCE",
+        font=FONT_HDR,
+        fg=CYBER_TEXT,
+        bg=CYBER_PANEL
+    ).pack(anchor="w", padx=10, pady=(14, 4))
+
+    air_bg = tk.Frame(right, bg=CYBER_BAR_BG, height=14)
+    air_bg.pack(fill="x", padx=10)
+
+    air_fg = tk.Frame(air_bg, bg="#ff4444", width=0)
+    air_fg.pack(side="left", fill="y")
+
+    air_val = tk.Label(
+        right,
+        text="0.00",
+        font=FONT_MONO,
+        fg=CYBER_MUTED,
+        bg=CYBER_PANEL
+    )
+    air_val.pack(anchor="e", padx=10)
+
+
     # ---------------- Stop Recovery ----------------
     tk.Label(
         right,
@@ -1166,6 +1678,11 @@ def start_unified_gui():
 
     # ---------------- Update Loop ----------------
     def update():
+                # ---- Airborne bar update ----
+        air = monitor_state.get("airborne_conf", 0.0)
+        air_fg.config(width=int(240 * air))
+        air_val.config(text=f"{air:.2f}")
+
         imu_var.set(
             f"ROLL  {monitor_state['roll']:+6.2f} deg\n"
             f"PITCH {monitor_state['pitch']:+6.2f} deg\n"
@@ -1185,7 +1702,7 @@ def start_unified_gui():
 
         raw_state.set(
             f"fsm={fsm_state}\n"
-            f"swing_leg={swing_leg}\n"
+            f"swing_legs={swing_legs}\n"
             f"roll_effort={monitor_state['roll_effort']:.3f}\n"
             f"offset_change={monitor_state['offset_change']:.3f}"
         )
@@ -1210,7 +1727,7 @@ def start_unified_gui():
             lbl.config(text=f"{s:.2f}")
         
         status_var.set(
-            f"{fsm_state} | swing={swing_leg} | "
+            f"{fsm_state} | swing={swing_legs} | "
             f"FRF={monitor_state['foot_contact'].get('FRF',0):.2f} "
             f"FLF={monitor_state['foot_contact'].get('FLF',0):.2f} "
             f"RRF={monitor_state['foot_contact'].get('RRF',0):.2f} "
@@ -1245,6 +1762,25 @@ gui_enabled = True
 last_servo_angles = {}
 for ch in FEET.values():
     last_servo_angles[ch] = 0.0
+
+# ==================================================
+# JOINT ↔ SERVO SEMANTIC MAP (FOR LOGGING)
+# ==================================================
+JOINT_MAP = {
+    "SHOULDER_FR": SHOULDERS["FR"],
+    "SHOULDER_FL": SHOULDERS["FL"],
+    "SHOULDER_RR": SHOULDERS["RR"],
+    "SHOULDER_RL": SHOULDERS["RL"],
+    "FOOT_FRF": FEET["FRF"],
+    "FOOT_FLF": FEET["FLF"],
+    "FOOT_RRF": FEET["RRF"],
+    "FOOT_RLF": FEET["RLF"],
+    "MID_FRM": 8,
+    "MID_FLM": 9,
+    "MID_RRM": 2,
+    "MID_RLM": 3,
+}
+
 # ==================================================
 # FOOT CONTACT ESTIMATION (READ-ONLY)
 # ==================================================
@@ -1272,8 +1808,8 @@ CONTACT_EFFORT_HIGH = 0.12     # roll_effort above this → resistance
 CONTACT_OFFSET_LOW  = 0.06     # offset_change below this → constrained
 CONTACT_MOTION_MIN  = 1.0      # deg — ignore noise-level motion
 
-CONTACT_RISE = 0.25           # confidence rise rate
-CONTACT_FALL = 0.06            # confidence fall rate
+CONTACT_RISE = 0.10          # confidence rise rate
+CONTACT_FALL = 0.30            # confidence fall rate
 
 # ==================================================
 # SLIP / TRACTION ESTIMATION (READ-ONLY)
@@ -1293,6 +1829,12 @@ for leg, ch in FEET.items():
     servo_angles[ch] = FOOT_STAND[leg]
 
 # ==================================================
+# INITIALIZE SERVO DELTA TRACKING
+# ==================================================
+for ch, ang in servo_angles.items():
+    last_servo_angles[ch] = ang
+
+# ==================================================
 # MAIN CONTROL LOOP — LAYER 1 REFLEX
 # ==================================================
 while True:
@@ -1303,6 +1845,11 @@ while True:
         az = safe_read_word(MPU_ADDR, ACCEL_XOUT_H + 4) - az_o
         gx = safe_read_word(MPU_ADDR, GYRO_XOUT_H) - gx_o
         gy = safe_read_word(MPU_ADDR, GYRO_XOUT_H + 2) - gy_o
+
+        # ---- RAW acceleration (DO NOT bias-correct) ----
+        ax_raw = safe_read_word(MPU_ADDR, ACCEL_XOUT_H)
+        ay_raw = safe_read_word(MPU_ADDR, ACCEL_XOUT_H + 2)
+        az_raw = safe_read_word(MPU_ADDR, ACCEL_XOUT_H + 4)
         
         # ---------- BRACE DETECTION ----------
         dax = ax - last_ax
@@ -1313,28 +1860,54 @@ while True:
         delta_a = math.sqrt(dax*dax + day*day + daz*daz)
 
         now = time.time()
-        
+        # ---------- RELATIVE ORIENTATION (FOR LOGGING & CONTROL) ----------
+        rel_roll  = roll - STAND_ROLL_REF if STAND_ROLL_REF is not None else 0.0
+        rel_pitch = pitch - STAND_PITCH_REF if STAND_PITCH_REF is not None else 0.0
+
         # ==================================================
         # LOG DATA (NON-BLOCKING)
         # ==================================================
-        if LOG_ENABLE and (now - last_log_time) >= LOG_DT:
-            log_f.write(
-                f"{now:.3f},"
-                f"{roll:.3f},{pitch:.3f},"
-                f"{posture_roll_bias:.3f},{posture_pitch_bias:.3f},"
-                f"{roll_effort:.3f},{offset_change:.3f},"
-                f"{fsm_state},{swing_leg},{int(brace_active)}\n"
-            )
+        if LOG_ENABLE and log_active and (now - last_log_time) >= LOG_DT:
+            for joint, ch in JOINT_MAP.items():
+
+                servo_ang = servo_angles.get(ch, 0.0)
+                servo_delta = servo_ang - last_servo_angles.get(ch, servo_ang)
+
+                # Infer leg name if applicable
+                leg = None
+                if "FRF" in joint: leg = "FRF"
+                elif "FLF" in joint: leg = "FLF"
+                elif "RRF" in joint: leg = "RRF"
+                elif "RLF" in joint: leg = "RLF"
+
+                motion_cmd = motion_offsets.get(leg, 0.0) if leg else 0.0
+                leg_resp   = leg_motion_response.get(leg, 0.0) if leg else 0.0
+                contact    = foot_contact.get(leg, 0.0) if leg else 0.0
+
+                log_f.write(
+                    f"{now:.3f},"
+                    f"{joint},{servo_ang:.2f},{servo_delta:.2f},"
+                    f"{motion_cmd:.2f},{leg_resp:.3f},{contact:.2f},"
+                    f"{rel_roll:.2f},{rel_pitch:.2f},"
+                    f"{posture_roll_bias:.2f},{posture_pitch_bias:.2f},"
+                    f"{roll_effort:.3f},{offset_change:.3f},"
+                )
+
+                last_servo_angles[ch] = servo_ang
+
             last_log_time = now
+
     
         if (delta_a > BRACE_ACCEL_THRESHOLD) and not brace_active:
             brace_active = True
             brace_until = now + BRACE_DURATION
 
             mag = max(delta_a, 1.0)
-            brace_pitch_bias = -dax / mag * BRACE_MAX_BIAS
-            brace_roll_bias  = -day / mag * BRACE_MAX_BIAS
-            
+            brace_pitch_bias = -BRACE_GAIN_PITCH * dax / mag * BRACE_MAX_BIAS
+            brace_roll_bias  = -BRACE_GAIN_ROLL  * day / mag * BRACE_MAX_BIAS
+            if abs(dax) < 0.7 * abs(day):
+                brace_pitch_bias = 0.0
+
             # ---------- BRACE DECAY ----------
         if brace_active:
             if now > brace_until:
@@ -1392,12 +1965,12 @@ while True:
         stability = max(0.0, min(1.0, stability))
         monitor_state["stability"] = stability
 
-        
         # ==================================================
         # APPLY POSTURE MODE (HIGH-LEVEL INTENT)
         # ==================================================
-        apply_posture_mode()
-        demo_tick()
+        if fsm_state == "IDLE" and not step_active:
+            apply_posture_mode()
+            demo_tick()
 
         # ==================================================
         # APPLY POSTURE BIAS (Layer-2)
@@ -1421,9 +1994,12 @@ while True:
         monitor_state["fsm_state"] = fsm_state
         monitor_state["step_active"] = step_active
         monitor_state["step_phase"] = fsm_state
-        monitor_state["ax"] = ax
-        monitor_state["ay"] = ay
-        monitor_state["az"] = az
+        monitor_state["ax"] = ax_raw
+        monitor_state["ay"] = ay_raw
+        monitor_state["az"] = az_raw
+        monitor_state["airborne"] = robot_airborne
+        monitor_state["airborne_conf"] = airborne_conf
+
 
         # ---- derived diagnostics ----
         avg_shoulder = sum(abs(v) for v in roll_offsets.values()) / len(roll_offsets)
@@ -1481,9 +2057,9 @@ while True:
         # ==================================================
            
         if fsm_state == "STOP_HOLD":
-            # absolutely no motion
-            posture_roll_target = 0.0
-            posture_pitch_target = 0.0
+            if not posture_locked:
+                posture_roll_target = 0.0
+                posture_pitch_target = 0.0
 
             for k in motion_offsets:
                 motion_offsets[k] = 0.0
@@ -1494,27 +2070,31 @@ while True:
                 fsm_state = "IDLE"
 
         if fsm_state == "IDLE" and motion_armed:
-            if swing_leg is not None:
+            if swing_legs:
+                primary_leg = swing_legs[0]
                 step_active = True
-                posture_roll_target  = UNLOAD_POSTURE[swing_leg]["roll"]
-                posture_pitch_target = UNLOAD_POSTURE[swing_leg]["pitch"]
+                posture_locked = True
+                posture_roll_target  = UNLOAD_POSTURE[primary_leg]["roll"]
+                posture_pitch_target = UNLOAD_POSTURE[primary_leg]["pitch"]
                 unload_start = time.time()
-
-                # IMPORTANT: freeze roll PD application
                 disable_roll_pd = True
-
                 fsm_state = "UNLOADING"
+
+
 
         elif fsm_state == "UNLOADING":
             # Authoritative geometric unload
             for shoulder in SHOULDERS:
-                body_target = UNLOAD_SHOULDER_OFFSETS[swing_leg].get(shoulder, 0.0)
+                body_target = 0.0
+                for leg in swing_legs:
+                    body_target += UNLOAD_SHOULDER_OFFSETS[leg].get(shoulder, 0.0)
+
                 servo_target = SHOULDER_SIGN[shoulder] * body_target
 
                 motion_offsets[shoulder] = ramp(
                     motion_offsets[shoulder],
                     servo_target,
-                    0.8
+                    2
                 )
 
             # TIME-GATED EXIT (AUTHORITATIVE)
@@ -1522,22 +2102,31 @@ while True:
                 fsm_state = "LIFTING"
             
         elif fsm_state == "LIFTING":
-            body_lift = LIFT_HEIGHT
-            servo_lift = FOOT_SIGN[swing_leg] * body_lift
+            done = True
+            for leg in swing_legs:
+                scale = 1.0 if leg.startswith("F") else 0.6
+                target = FOOT_SIGN[leg] * LIFT_HEIGHT * scale
 
-            motion_offsets[swing_leg] = ramp(
-                motion_offsets[swing_leg],
-                servo_lift,
-                LIFT_STEP
-            )
+                motion_offsets[leg] = ramp(
+                    motion_offsets[leg],
+                    target,
+                    LIFT_STEP
+                )
 
-            if abs(motion_offsets[swing_leg] - servo_lift) < 0.3:
-                fsm_state = "DONE"
+                if abs(motion_offsets[leg] - target) >= 0.3:
+                    done = False
+
+            if done:
+                if manual_mode:
+                    pass            # stay lifted
+                else:
+                    fsm_state = "DONE"
+
+
                 
         elif fsm_state == "DONE":
-            posture_roll_target = 0.0
-            posture_pitch_target = 0.0
             fsm_state = "RECENTERING"
+
                 
         elif fsm_state == "RECENTERING":
             # Gradually remove posture bias
@@ -1558,27 +2147,36 @@ while True:
                 all(abs(motion_offsets[k]) < RECENTER_THRESH for k in motion_offsets)
             )
             if all_centered:
-                # Reset roll offsets so PD resumes from neutral
                 for k in roll_offsets:
                     roll_offsets[k] = 0.0
 
-                # Re-enable roll PD cleanly
                 disable_roll_pd = False
 
-                swing_leg = None
+                swing_legs = []
                 gui_selected_leg = None
-                fsm_state = "IDLE"    
+
+                # 🔓 EXIT MANUAL MODE CLEANLY
+                manual_leg = None
+                manual_mode = False
+
+                fsm_state = "IDLE"
+        
+        # ---- Cancel pump on any motion ----
+        if step_active or fsm_state != "IDLE":
+            pump_active = False
+
+
                     
         # ==================================================
         # STEP COMPLETION — CONTACT-GATED (FINAL)
         # ==================================================
         if (
             step_active
-            and swing_leg is not None
-            and foot_contact[swing_leg] > 0.75
+            and swing_legs
+            and all(foot_contact[l] > 0.75 for l in swing_legs)
             and fsm_state in ("DONE", "RECENTERING")
         ):
-            completed_leg = swing_leg
+            completed_leg = swing_legs[0]
             # Clear posture intent
             posture_roll_target  = 0.0
             posture_pitch_target = 0.0
@@ -1595,10 +2193,10 @@ while True:
             disable_roll_pd = False
 
             # Clear step state
-            swing_leg = None
+            swing_legs = []
             gui_selected_leg = None
             step_active = False
-            
+            posture_locked = False   # 🔓 RELEASE posture control
 
             # FSM returns to neutral
             monitor_state["last_step_ok"] = (foot_contact[completed_leg] > 0.75)
@@ -1608,8 +2206,13 @@ while True:
         # STEP INVARIANT CHECK (DEBUG / SAFE)
         # ==================================================
         if fsm_state == "IDLE" and not step_active:
-            assert swing_leg is None
+            # HARD SAFETY: roll PD must be enabled in IDLE
+            if disable_roll_pd:
+                disable_roll_pd = False
+
+            assert not swing_legs
             assert disable_roll_pd is False
+
 
             assert abs(posture_roll_bias) <= POSTURE_MAX_ROLL
             assert abs(posture_pitch_bias) <= POSTURE_MAX_PITCH
@@ -1622,7 +2225,11 @@ while True:
                 "LEAN_BACK",
                 "SIT",
                 "KNEEL",
+                "SHOW",
+                "REAR_LIFT",
+                "HI"
             )
+
 
             # Posture mode must be valid
             assert posture_mode in (
@@ -1633,7 +2240,33 @@ while True:
                 "LEAN_BACK",
                 "SIT",
                 "KNEEL",
+                "SHOW",
+                "REAR_LIFT",
+                "HI"
             )
+
+
+        # ==================================================
+        # AIRBORNE SAFETY OVERRIDE
+        # ==================================================
+        if robot_airborne and not posture_locked:
+            disable_roll_pd = False
+            posture_roll_target = 0.0
+            posture_pitch_target = 0.0
+
+            # Cancel steps safely
+            step_active = False
+            swing_legs = []
+            fsm_state = "IDLE"
+
+
+        # ==================================================
+        # AIRBORNE RECOVERY (RE-ENABLE BALANCE)
+        # ==================================================
+        '''if not robot_airborne and disable_roll_pd:
+            if fsm_state == "IDLE" and not step_active:
+                disable_roll_pd = False'''
+
 
         # ---------- ROLL REFLEX ----------
         # Shoulders widen/narrow stance to resist tipping
@@ -1657,7 +2290,17 @@ while True:
         
 
         for leg, ch in SHOULDERS.items():
-            applied_cmd = 0.0 if disable_roll_pd else roll_cmd
+            # -------- Asymmetric roll gain scheduling --------
+            gain = ROLL_GAIN_NEUTRAL
+            if step_active and swing_legs:
+                primary_leg = swing_legs[0]
+                if primary_leg in LEG_SUPPORT_SHOULDERS:
+                    if leg in LEG_SUPPORT_SHOULDERS[primary_leg]:
+                        gain = ROLL_GAIN_SUPPORT
+                    else:
+                        gain = ROLL_GAIN_UNLOAD
+
+            applied_cmd = 0.0 if disable_roll_pd else gain * roll_cmd
             delta = applied_cmd - roll_offsets[leg]
             delta = max(-ROLL_STEP, min(ROLL_STEP, delta))
             if abs(delta) < 0.05:
@@ -1676,8 +2319,10 @@ while True:
                 + motion_offsets[leg]       # Layer-2 motion
             )
 
-            set_servo_angle(ch, angle)
-            servo_angles[ch] = angle
+            if not teach_mode:
+                set_servo_angle(ch, angle)
+                servo_angles[ch] = angle
+
             
         # ADD — compute average shoulder offset change (how much roll offsets moved this loop)
         # Place right after the shoulder loop ends
@@ -1693,15 +2338,21 @@ while True:
 
         # ---------- PITCH REFLEX ----------
         # Knees flex/extend to shift vertical load
+
         for leg, ch in FEET.items():
             pitch_rate = gy / 131.0     # deg/s
             if abs(pitch_rate) < GYRO_RATE_DEADBAND:
                 pitch_rate = 0.0
 
-            tgt = (
-                gain_scale * (K_PITCH * effective_pitch + K_PITCH_RATE * pitch_rate)
-                + brace_pitch_bias
-            ) * (1 if leg.startswith("F") else -1)
+            # Disable pitch reflex on swing legs during lift
+            if step_active and leg in swing_legs:
+                tgt = 0.0
+            else:
+                tgt = (
+                    gain_scale * (K_PITCH * effective_pitch + K_PITCH_RATE * pitch_rate)
+                    + brace_pitch_bias
+                ) * (1 if leg.startswith("F") else -1)
+
             tgt = max(-PITCH_LIMIT, min(PITCH_LIMIT, tgt))
 
             if posture_mode == "STAND" and not step_active:
@@ -1715,22 +2366,34 @@ while True:
 
             motion_offsets[leg] = max(-40.0, min(40.0, motion_offsets[leg]))
 
+            # ---------- Knee pump (action-level, symmetric) ----------
+            pump_offset = 0.0
+            if pump_active and not step_active and fsm_state == "IDLE":
+                pump_offset = knee_pump(time.time() - pump_start_time)
+
             angle = (
                 FOOT_STAND[leg]
                 + FOOT_SIGN[leg] * pitch_offsets[leg]
                 + motion_offsets[leg]
+                + pump_offset
                 + prop_target.get(leg, 0.0)
             )
 
+
             angle = max(FOOT_LIMITS[leg][0], min(FOOT_LIMITS[leg][1], angle))
-            set_servo_angle(ch, angle)
-            servo_angles[ch] = angle
+
+            if not teach_mode:
+                set_servo_angle(ch, angle)
+                servo_angles[ch] = angle
+
         
         # ---------- MID-LIMB POSTURE (kneel only) ----------
         for ch, base in MID_LIMBS.items():
             angle = base + mid_offsets[ch]
-            set_servo_angle(ch, angle)
-            servo_angles[ch] = angle
+            if not teach_mode:
+                set_servo_angle(ch, angle)
+                servo_angles[ch] = angle
+
         
 
         # ==================================================
@@ -1746,20 +2409,83 @@ while True:
         # FOOT CONTACT CONFIDENCE UPDATE (READ-ONLY)
         # ==================================================
         for leg in FEET:
-            if abs(motion_offsets[leg]) < CONTACT_MOTION_MIN:
-                continue
 
+            # ---------- SLOW LIFT / GRAVITY UNLOAD ----------
+            gravity_loss = abs(abs(az_raw) - GRAVITY_NOMINAL)
+
+            if (
+                fsm_state == "IDLE"
+                and not step_active
+                and gravity_loss > GRAVITY_LOSS_THRESH
+                and abs(motion_offsets[leg]) < CONTACT_MOTION_MIN
+                and leg_motion_response[leg] > LEG_RESPONSE_HIGH
+            ):
+                foot_contact[leg] = max(0.0, foot_contact[leg] - CONTACT_FALL)
+                pass
+
+            # ---------- ACTIVE STEP CASE ----------
             if fsm_state in ("LIFTING", "DONE"):
-                if (
-                    leg == swing_leg and
-                    abs(motion_offsets[leg]) > 0.5
-                ):
+                if leg in swing_legs and abs(motion_offsets[leg]) > 0.25:
                     foot_contact[leg] = max(0.0, foot_contact[leg] - CONTACT_FALL)
 
+            # ---------- RECOVERY ----------
             elif fsm_state in ("RECENTERING", "IDLE"):
                 foot_contact[leg] = min(1.0, foot_contact[leg] + CONTACT_RISE)
 
         monitor_state["foot_contact"] = dict(foot_contact)
+        # ==================================================
+        # AIRBORNE DETECTION (FUSED, AUTHORITATIVE)
+        # ==================================================
+
+        # 1) Overall ground confidence (worst foot)
+        ground_conf = min(foot_contact.values())
+        avg_contact = sum(foot_contact.values()) / len(foot_contact)
+
+        # 2) Count how many legs are "free moving"
+        free_legs = sum(
+            leg_motion_response[l] > LEG_RESPONSE_HIGH
+            for l in FEET
+        )
+
+        # 3) Acceleration magnitude anomaly (gravity disturbance)
+        acc_mag = math.sqrt(ax_raw*ax_raw + ay_raw*ay_raw + az_raw*az_raw)
+        acc_anomaly = abs(acc_mag - 16384)
+
+        # 4) Discrete airborne evidence score
+        airborne_score = 0
+        slow_lift = (
+            avg_contact < SLOW_LIFT_CONTACT_MAX and
+            roll_effort < SLOW_LIFT_EFFORT_MAX
+        )
+
+
+
+        if ground_conf < 0.25:
+            airborne_score += 2
+
+        if free_legs >= 3:
+            airborne_score += 2
+
+        if acc_anomaly > 3500:
+            airborne_score += 1
+        
+        # Convert score → confidence ramp
+        # PRIMARY airborne evidence: contact collapse
+        if avg_contact < 0.35:
+            airborne_conf = min(1.0, airborne_conf + AIRBORNE_RISE)
+
+        # SECONDARY: multiple free-moving legs
+        elif free_legs >= 3:
+            airborne_conf = min(1.0, airborne_conf + AIRBORNE_RISE)
+
+        # TERTIARY: acceleration anomaly (fast lift / drop)
+        elif acc_anomaly > 3500:
+            airborne_conf = min(1.0, airborne_conf + AIRBORNE_RISE)
+
+        else:
+            airborne_conf = max(0.0, airborne_conf - SLOW_LIFT_FALL)
+
+        robot_airborne = airborne_conf > 0.6
         monitor_state["leg_motion_response"] = dict(leg_motion_response)
 
         # ==================================================
@@ -1795,14 +2521,16 @@ while True:
             prop_target[k] = 0.0
 
         # 1) FRONT LEGS: push during REAR unload/lift
-        if fsm_state in ("UNLOADING", "LIFTING") and swing_leg in REAR_LEGS:
-            for leg in FRONT_LEGS:
-                if foot_contact.get(leg, 0.0) < PROP_CONTACT_MIN:
-                    continue
-                if slip_score.get(leg, 0.0) > PROP_SLIP_MAX:
-                    continue
+        if fsm_state in ("UNLOADING", "LIFTING") and swing_legs:
+            primary_leg = swing_legs[0]
+            if primary_leg in REAR_LEGS:
+                for leg in FRONT_LEGS:
+                    if foot_contact.get(leg, 0.0) < PROP_CONTACT_MIN:
+                        continue
+                    if slip_score.get(leg, 0.0) > PROP_SLIP_MAX:
+                        continue
 
-                prop_target[leg] = -PROP_PUSH_DEG
+                    prop_target[leg] = -PROP_PUSH_DEG
 
 
         # 2) REAR LEGS: gentle push during IDLE stance (compensate backward loss)

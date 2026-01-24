@@ -43,8 +43,8 @@ ACCEL_CONFIG = 0x1C
 # ==================================================
 # PWM pulse range for your servos
 # ❌ Do not change unless servo specs change
-PULSE_MIN = 80
-PULSE_MAX = 561
+PULSE_MIN = 106
+PULSE_MAX = 535
 
 # ==================================================
 # SHOULDER JOINTS — ROLL CONTROL
@@ -129,18 +129,6 @@ FOOT_SIGN = {
 # Mechanical safety limits — PREVENT DAMAGE
 FOOT_LIMITS = {k: (0, 190) for k in FEET}
 
-# Which shoulders primarily support which foot
-LEG_SUPPORT_SHOULDERS = {
-    "FRF": ("FL", "RL"),   # support diagonally opposite
-    "FLF": ("FR", "RR"),
-    "RRF": ("FL", "RL"),
-    "RLF": ("FR", "RR"),
-}
-
-ROLL_GAIN_SUPPORT = 1.25     # stronger support reaction
-ROLL_GAIN_UNLOAD  = 0.55     # soften swing side
-ROLL_GAIN_NEUTRAL = 1.0
-
 # ==================================================
 # CONTROL PARAMETERS (THIS IS WHERE YOU TUNE)
 # ==================================================
@@ -208,7 +196,6 @@ SLOW_LIFT_EFFORT_MAX = 0.08
 
 
 
-
 # ==================================================
 # STEP PRIMITIVE (SEALED)
 # A STEP consists of:
@@ -218,10 +205,6 @@ SLOW_LIFT_EFFORT_MAX = 0.08
 # ==================================================
 
 step_active = False
-
-manual_leg = None      # GUI-selected leg only
-manual_mode = False   # True = GUI controls FSM
-
 
 # ==================================================
 # GAIT SEQUENCER (SAFE, EVENT-DRIVEN)
@@ -237,10 +220,6 @@ gait_index = 0
 
 STOP_HOLD_TIME = 1.5   # seconds
 stop_hold_until = 0.0
-
-show_motion = None   # default
-
-
 
 # ==================================================
 # MICRO PROPULSION (STANCE PUSH) — OPTION 1
@@ -267,9 +246,6 @@ POSTURE_ID = {
     "LEAN_BACK": 4,
     "SIT": 5,
     "KNEEL": 6,
-    "SHOW": 7,
-    "REAR_LIFT": 8,
-
 }
 
 # ==================================================
@@ -325,9 +301,6 @@ LOG_ENABLE = True
 LOG_DT = 0.05           # log at control rate (20 Hz)
 LOG_FILE = "run_log.csv"
 last_log_time = 0.0
-log_active = False        # 👈 MASTER GATE
-log_start_time = 0.0
-
 
 SERVO_DELTA_GROUND = 0.15   # deg → constrained
 SERVO_DELTA_AIR    = 0.6    # deg → free
@@ -335,13 +308,10 @@ SERVO_DELTA_AIR    = 0.6    # deg → free
 if LOG_ENABLE:
     log_f = open(LOG_FILE, "w")
     log_f.write(
-        "t,"
-        "joint,servo_angle,servo_delta,"
-        "motion_cmd,leg_response,foot_contact,"
-        "roll,pitch,"
+        "t,roll,pitch,"
         "posture_roll,posture_pitch,"
         "roll_effort,offset_change,"
-        "posture_mode,fsm\n"
+        "fsm,swing,brace\n"
     )
     log_f.flush()
     
@@ -391,22 +361,6 @@ MID_LIMBS = {
     2: 102,   # RRM
     3: 154,   # RLM
 }
-# Mid-limb direction signs (mirror rule)
-# Right side = +1, Left side = -1
-MID_SIGN = {
-    8: +1,   # FRM (front right mid)
-    9: -1,   # FLM (front left mid)
-    2: +1,   # RRM (rear right mid)
-    3: -1,   # RLM (rear left mid)
-}
-
-
-# Rear mid-limb channels only
-REAR_MID_LIMBS = {
-    2: MID_LIMBS[2],   # RRM
-    3: MID_LIMBS[3],   # RLM
-}
-
 
 for ch, angle in MID_LIMBS.items():
     set_servo_angle(ch, angle)
@@ -509,29 +463,6 @@ print("[PLOT] plotter process started")
 # ===============================
 # LAYER-2: POSTURE / MOTION STATE
 # ===============================
-# ==================================================
-# SHOW MODE (CROWD DEMO)
-# ==================================================
-show_active = False
-show_start_time = 0.0
-
-# ==================================================
-# GLOBAL ACTION: KNEE PUMP (SAFE, SYMMETRIC)
-# ==================================================
-pump_active = False
-pump_start_time = 0.0
-
-PUMP_FREQ = 0.6        # Hz (slow, dog-like)
-PUMP_AMP  = 10.0       # degrees (SAFE: 6–12)
-
-# ==================================================
-# REAR MID-LIMB LIFT + FOOT DROP (CONTINUOUS)
-# ==================================================
-REAR_LIFT_FREQ = 0.4      # Hz (slow, stable)
-REAR_MID_AMP   = 10.0     # degrees (SAFE)
-FOOT_DROP_AMP  = 20.0     # degrees (SAFE)
-
-
 # ==================================================
 # POSTURE MODES (HIGH-LEVEL INTENT)
 # ==================================================
@@ -647,46 +578,6 @@ def ramp(current, target, step):
 # ==================================================
 # POSTURE MODE RESOLVER (SAFE, COMPOSABLE)
 # ==================================================
-# ==================================================
-# SHOW MOTION PRIMITIVES (VISUAL, CROWD MODE)
-# ==================================================
-
-def sway(t):
-    """
-    Left-right body sway with knee pumping.
-    Dramatic, safe, visually expressive.
-    """
-    roll  = SHOW_ROLL_AMP * math.sin(2 * math.pi * SHOW_FREQ_SWAY * t)
-    pitch = -SHOW_PITCH_AMP * abs(
-        math.sin(2 * math.pi * SHOW_FREQ_SQUAT * t)
-    )
-
-    knee = SHOW_KNEE_AMP * math.sin(2 * math.pi * SHOW_FREQ_SWAY * t)
-
-    return roll, pitch, knee
-
-def knee_pump(t):
-    """
-    Symmetric knee pump.
-    All feet move together (no unloading).
-    """
-    return PUMP_AMP * math.sin(2 * math.pi * PUMP_FREQ * t)
-
-def rear_lift_wave(t):
-    """
-    Continuous rear mid-limb lift + foot drop.
-    Rear mid-limbs lift upward.
-    All feet lower symmetrically.
-    """
-    phase = math.sin(2 * math.pi * REAR_LIFT_FREQ * t)
-
-    mid_offset = REAR_MID_AMP * phase
-    foot_offset = -FOOT_DROP_AMP * phase   # negative = drop
-
-    return mid_offset, foot_offset
-
-
-
 def apply_posture_mode():
     global posture_roll_target, posture_pitch_target
 
@@ -749,60 +640,6 @@ def apply_posture_mode():
         # 🔥 Mid-limbs (NEW)
         for ch, val in tgt["midlimbs"].items():
             mid_offsets[ch] = ramp(mid_offsets[ch], val, MID_RECENTER_STEP)
-    
-    elif posture_mode == "REAR_LIFT":
-        t = time.time() - last_posture_change_time
-
-        mid_delta, foot_delta = rear_lift_wave(t)
-
-        # ---- Rear mid-limbs only ----
-        for ch in REAR_MID_LIMBS:
-            mid_offsets[ch] = ramp(
-                mid_offsets[ch],
-                MID_SIGN[ch] * mid_delta,
-                MID_RECENTER_STEP
-            )
-
-
-        # ---- All feet ----
-        for leg in FEET:
-            motion_offsets[leg] = ramp(
-                motion_offsets[leg],
-                FOOT_SIGN[leg] * foot_delta,
-                1.0
-            )
-
-
-        posture_roll_target  = 0.0
-        posture_pitch_target = 0.0
-
-
-    elif posture_mode == "SHOW":
-        # SHOW mode is currently limited to safe upper-body motion only
-        if show_motion is None:
-            posture_roll_target  = 0.0
-            posture_pitch_target = 0.0
-            return
-
-        t = time.time() - show_start_time
-        # New sway does NOT affect posture
-        posture_roll_target  = 0.0
-        posture_pitch_target = 0.0
-
-
-        # HARD SAFETY: SHOW must never command knees
-        for leg in FEET:
-            motion_offsets[leg] = ramp(
-                motion_offsets[leg],
-                0.0,
-                0.8
-            )
-
-
-
-
-
-
 
 
 
@@ -878,15 +715,15 @@ UNLOAD_SHOULDER_OFFSETS = {
     },
     # Lifting REAR RIGHT foot
     "RRF": {
-        "FR": +10.0,
-        "FL": +10.0,
+        "FR": +7.0,
+        "FL": +7.0,
         "RL": -15.0,
         "RR":  0.0,
     },
     # Lifting REAR LEFT foot
     "RLF": {
-        "FR": +9.0,
-        "FL": +9.0,
+        "FR": +5.0,
+        "FL": +5.0,
         "RR": -10.0,
         "RL":  0.0,
     },
@@ -904,8 +741,8 @@ gui_selected_leg = None      # "FRF", "FLF", "RRF", "RLF"
 gui_enabled = False
 
 # LIFT parameters
-LIFT_HEIGHT = 30.0      # deg (knee flex offset as motion)
-LIFT_STEP = 1        # deg per cycle for knee motion
+LIFT_HEIGHT = 15.0      # deg (knee flex offset as motion)
+LIFT_STEP = 0.8         # deg per cycle for knee motion
 UNLOAD_SETTLE_THRESH = 1.0  # deg — how close IMU must be to posture bias
 
 # ==================================================
@@ -982,12 +819,6 @@ def start_unified_gui():
     CYBER_TEXT = "#e6e6e6"
     CYBER_MUTED = "#9a9a9a"
 
-    def set_sway():
-        global show_motion, posture_mode, show_start_time
-        posture_mode = "SHOW"
-        show_motion = sway
-        show_start_time = time.time()
-
     global gui_selected_leg
 
     root = tk.Tk()
@@ -1026,47 +857,11 @@ def start_unified_gui():
     main = tk.Frame(root, bg="#0b0b0b")
     main.pack(fill="both", expand=True, padx=8, pady=8)
 
-    # ================= LEFT SCROLLABLE PANEL =================
-    left_container = tk.Frame(main, bg="#151515", width=320)
-    left_container.pack(side="left", fill="y", padx=(0, 8))
-
-    left_canvas = tk.Canvas(
-        left_container,
-        bg="#151515",
-        highlightthickness=0,
-        width=200
-    )
-    left_canvas.pack(side="left", fill="both", expand=True)
-
-    left_scroll = tk.Scrollbar(
-        left_container,
-        orient="vertical",
-        command=left_canvas.yview
-    )
-    left_scroll.pack(side="right", fill="y")
-
-    left_canvas.configure(yscrollcommand=left_scroll.set)
-
-    # 👇 THIS replaces your old `left` frame
-    left = tk.Frame(left_canvas, bg="#151515")
-    left_canvas.create_window((0, 0), window=left, anchor="nw")
-
-    # Auto-update scroll region
-    def _on_left_configure(event):
-        left_canvas.configure(scrollregion=left_canvas.bbox("all"))
-
-    left.bind("<Configure>", _on_left_configure)
-
-    # Mouse wheel support
-    def _on_mousewheel(event):
-        left_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-    left_canvas.bind_all("<MouseWheel>", _on_mousewheel)
-
-    # ================= RIGHT PANEL (UNCHANGED) =================
+    left  = tk.Frame(main, bg="#151515", width=300)
     right = tk.Frame(main, bg="#151515")
-    right.pack(side="right", fill="both", expand=True)
 
+    left.pack(side="left", fill="y", padx=(0, 8))
+    right.pack(side="right", fill="both", expand=True)
 
     # ==================================================
     # LEFT PANEL — CONTROLS + RAW STATE
@@ -1110,96 +905,6 @@ def start_unified_gui():
 
     tk.Button(left, text="KNEEL", command=lambda: set_posture("KNEEL"),
             bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=2)
-    
-    def start_show():
-        posture_mode = "SHOW"
-        show_motion = sway
-
-    tk.Button(
-        left,
-        text="✨ SHOW MODE",
-        command=start_show,
-        bg="#ff2ec4",
-        fg="#000000",
-        relief="flat",
-        font=FONT_HDR
-    ).pack(fill="x", padx=10, pady=(8,4))
-
-    def start_pump():
-        global pump_active, pump_start_time
-        if step_active or fsm_state != "IDLE":
-            return
-        pump_active = True
-        pump_start_time = time.time()
-
-    def stop_pump():
-        global pump_active
-        pump_active = False
-
-    tk.Button(
-        left, text="🐕 SWAY",
-        command=start_pump,
-        bg="#224422", fg="#ccffcc",
-        relief="flat", font=FONT_HDR
-    ).pack(fill="x", padx=10, pady=4)
-
-    tk.Button(
-        left, text="STOP SWAY",
-        command=stop_pump,
-        bg="#222222", fg="#e6e6e6",
-        relief="flat"
-    ).pack(fill="x", padx=10, pady=2)
-
-
-    tk.Label(left, text="SHOW MOTIONS", font=FONT_HDR,
-         fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(6,2))
-
-    tk.Button(left, text="IGNORE",
-            command=set_sway,
-            bg="#222222", fg="#e6e6e6",
-            relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=2)
-    
-    tk.Button(
-        left, text="PUMP UP DOWN",
-        command=lambda: set_posture("REAR_LIFT"),
-        bg="#333333", fg="#ffffff",
-        relief="flat"
-    ).pack(fill="x", padx=10, pady=2)
-
-
-    # ---------------- LOG CONTROL ----------------
-    tk.Label(left, text="LOGGING", font=FONT_HDR,
-            fg="#ffffff", bg="#151515").pack(anchor="w", padx=10, pady=(10,2))
-
-    def start_log():
-        global log_active, log_start_time
-        log_active = True
-        log_start_time = time.time()
-        log_f.write("# EVENT_START %.3f\n" % time.time())
-        log_f.flush()                     
-        print("[LOG] started")
-
-
-    def stop_log():
-        global log_active
-        log_active = False
-        log_f.write("# EVENT_END %.3f\n" % time.time())
-        log_f.flush()                 
-        print("[LOG] stopped")
-
-
-    tk.Button(left, text="▶ START LOG",
-            command=start_log,
-            bg="#004400", fg="#ccffcc",
-            relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=2)
-
-    tk.Button(left, text="■ STOP LOG",
-            command=stop_log,
-            bg="#440000", fg="#ffcccc",
-            relief="flat", font=FONT_MAIN).pack(fill="x", padx=10, pady=(0,4))
-
-
-
 
     selected_leg_var = tk.StringVar(value="None")
 
@@ -1221,14 +926,13 @@ def start_unified_gui():
 
 
     def select_leg(leg):
-        global manual_leg, manual_mode
-        if step_active or fsm_state != "IDLE":
+        global gui_selected_leg
+        accepted = request_step(leg)
+        if accepted:
+            gui_selected_leg = leg
+            selected_leg_var.set(leg)
+        else:
             selected_leg_var.set("BUSY")
-            return
-
-        manual_leg = leg
-        manual_mode = True
-        selected_leg_var.set(leg)
 
     for leg in ["FRF", "FLF", "RRF", "RLF"]:
         tk.Button(
@@ -1245,44 +949,16 @@ def start_unified_gui():
     tk.Label(left, textvariable=selected_leg_var, font=FONT_MONO, fg="#ffffff", bg="#151515").pack(anchor="w", padx=10)
 
     def lift():
-        global swing_leg, step_active, fsm_state
-        global posture_locked, disable_roll_pd, unload_start
-
-        if manual_leg is None:
-            return
-        if fsm_state != "IDLE":
-            return
-
-        swing_leg = manual_leg
-        step_active = True
-        posture_locked = True
-        manual_mode = True
-
-        posture_roll_target  = UNLOAD_POSTURE[swing_leg]["roll"]
-        posture_pitch_target = UNLOAD_POSTURE[swing_leg]["pitch"]
-
-        disable_roll_pd = True
-        unload_start = time.time()
-        fsm_state = "UNLOADING"
-
+        pass
         
     def lower():
-        global fsm_state
-
-        if not manual_mode:
-            return
-        if fsm_state not in ("LIFTING",):
-            return
-
-        fsm_state = "RECENTERING"
-
+        pass
 
     tk.Button(left, text="LIFT", command=lift, bg="#333333", fg="#ffffff", relief="flat", font=FONT_HDR).pack(fill="x", padx=10, pady=(12, 4))
     tk.Button(left, text="LOWER", command=lower, bg="#222222", fg="#e6e6e6", relief="flat").pack(fill="x", padx=10, pady=4)
     
     def start_gait():
-        global gait_enabled, posture_mode
-        posture_mode = "STAND" 
+        global gait_enabled
         motion_armed = True
         gait_enabled = True
 
@@ -1625,25 +1301,6 @@ gui_enabled = True
 last_servo_angles = {}
 for ch in FEET.values():
     last_servo_angles[ch] = 0.0
-
-# ==================================================
-# JOINT ↔ SERVO SEMANTIC MAP (FOR LOGGING)
-# ==================================================
-JOINT_MAP = {
-    "SHOULDER_FR": SHOULDERS["FR"],
-    "SHOULDER_FL": SHOULDERS["FL"],
-    "SHOULDER_RR": SHOULDERS["RR"],
-    "SHOULDER_RL": SHOULDERS["RL"],
-    "FOOT_FRF": FEET["FRF"],
-    "FOOT_FLF": FEET["FLF"],
-    "FOOT_RRF": FEET["RRF"],
-    "FOOT_RLF": FEET["RLF"],
-    "MID_FRM": 8,
-    "MID_FLM": 9,
-    "MID_RRM": 2,
-    "MID_RLM": 3,
-}
-
 # ==================================================
 # FOOT CONTACT ESTIMATION (READ-ONLY)
 # ==================================================
@@ -1692,12 +1349,6 @@ for leg, ch in FEET.items():
     servo_angles[ch] = FOOT_STAND[leg]
 
 # ==================================================
-# INITIALIZE SERVO DELTA TRACKING
-# ==================================================
-for ch, ang in servo_angles.items():
-    last_servo_angles[ch] = ang
-
-# ==================================================
 # MAIN CONTROL LOOP — LAYER 1 REFLEX
 # ==================================================
 while True:
@@ -1723,43 +1374,19 @@ while True:
         delta_a = math.sqrt(dax*dax + day*day + daz*daz)
 
         now = time.time()
-        # ---------- RELATIVE ORIENTATION (FOR LOGGING & CONTROL) ----------
-        rel_roll  = roll - STAND_ROLL_REF if STAND_ROLL_REF is not None else 0.0
-        rel_pitch = pitch - STAND_PITCH_REF if STAND_PITCH_REF is not None else 0.0
-
+        
         # ==================================================
         # LOG DATA (NON-BLOCKING)
         # ==================================================
-        if LOG_ENABLE and log_active and (now - last_log_time) >= LOG_DT:
-            for joint, ch in JOINT_MAP.items():
-
-                servo_ang = servo_angles.get(ch, 0.0)
-                servo_delta = servo_ang - last_servo_angles.get(ch, servo_ang)
-
-                # Infer leg name if applicable
-                leg = None
-                if "FRF" in joint: leg = "FRF"
-                elif "FLF" in joint: leg = "FLF"
-                elif "RRF" in joint: leg = "RRF"
-                elif "RLF" in joint: leg = "RLF"
-
-                motion_cmd = motion_offsets.get(leg, 0.0) if leg else 0.0
-                leg_resp   = leg_motion_response.get(leg, 0.0) if leg else 0.0
-                contact    = foot_contact.get(leg, 0.0) if leg else 0.0
-
-                log_f.write(
-                    f"{now:.3f},"
-                    f"{joint},{servo_ang:.2f},{servo_delta:.2f},"
-                    f"{motion_cmd:.2f},{leg_resp:.3f},{contact:.2f},"
-                    f"{rel_roll:.2f},{rel_pitch:.2f},"
-                    f"{posture_roll_bias:.2f},{posture_pitch_bias:.2f},"
-                    f"{roll_effort:.3f},{offset_change:.3f},"
-                )
-
-                last_servo_angles[ch] = servo_ang
-
+        if LOG_ENABLE and (now - last_log_time) >= LOG_DT:
+            log_f.write(
+                f"{now:.3f},"
+                f"{roll:.3f},{pitch:.3f},"
+                f"{posture_roll_bias:.3f},{posture_pitch_bias:.3f},"
+                f"{roll_effort:.3f},{offset_change:.3f},"
+                f"{fsm_state},{swing_leg},{int(brace_active)}\n"
+            )
             last_log_time = now
-
     
         if (delta_a > BRACE_ACCEL_THRESHOLD) and not brace_active:
             brace_active = True
@@ -1828,12 +1455,14 @@ while True:
         stability = max(0.0, min(1.0, stability))
         monitor_state["stability"] = stability
 
+        
         # ==================================================
         # APPLY POSTURE MODE (HIGH-LEVEL INTENT)
         # ==================================================
         if fsm_state == "IDLE" and not step_active:
             apply_posture_mode()
             demo_tick()
+
 
         # ==================================================
         # APPLY POSTURE BIAS (Layer-2)
@@ -1952,7 +1581,7 @@ while True:
                 motion_offsets[shoulder] = ramp(
                     motion_offsets[shoulder],
                     servo_target,
-                    2
+                    0.8
                 )
 
             # TIME-GATED EXIT (AUTHORITATIVE)
@@ -1970,11 +1599,7 @@ while True:
             )
 
             if abs(motion_offsets[swing_leg] - servo_lift) < 0.3:
-                if manual_mode:
-                    pass            # 🔒 stay lifted, wait for LOWER
-                else:
-                    fsm_state = "DONE"
-
+                fsm_state = "DONE"
                 
         elif fsm_state == "DONE":
             fsm_state = "RECENTERING"
@@ -1999,25 +1624,16 @@ while True:
                 all(abs(motion_offsets[k]) < RECENTER_THRESH for k in motion_offsets)
             )
             if all_centered:
+                # Reset roll offsets so PD resumes from neutral
                 for k in roll_offsets:
                     roll_offsets[k] = 0.0
 
+                # Re-enable roll PD cleanly
                 disable_roll_pd = False
 
                 swing_leg = None
                 gui_selected_leg = None
-
-                # 🔓 EXIT MANUAL MODE CLEANLY
-                manual_leg = None
-                manual_mode = False
-
-                fsm_state = "IDLE"
-        
-        # ---- Cancel pump on any motion ----
-        if step_active or fsm_state != "IDLE":
-            pump_active = False
-
-
+                fsm_state = "IDLE"    
                     
         # ==================================================
         # STEP COMPLETION — CONTACT-GATED (FINAL)
@@ -2077,10 +1693,7 @@ while True:
                 "LEAN_BACK",
                 "SIT",
                 "KNEEL",
-                "SHOW",
-                "REAR_LIFT"
             )
-
 
             # Posture mode must be valid
             assert posture_mode in (
@@ -2091,10 +1704,7 @@ while True:
                 "LEAN_BACK",
                 "SIT",
                 "KNEEL",
-                "SHOW",
-                "REAR_LIFT"
             )
-
 
         # ==================================================
         # AIRBORNE SAFETY OVERRIDE
@@ -2139,15 +1749,7 @@ while True:
         
 
         for leg, ch in SHOULDERS.items():
-            # -------- Asymmetric roll gain scheduling --------
-            gain = ROLL_GAIN_NEUTRAL
-            if step_active and swing_leg in LEG_SUPPORT_SHOULDERS:
-                if leg in LEG_SUPPORT_SHOULDERS[swing_leg]:
-                    gain = ROLL_GAIN_SUPPORT
-                else:
-                    gain = ROLL_GAIN_UNLOAD
-
-            applied_cmd = 0.0 if disable_roll_pd else gain * roll_cmd
+            applied_cmd = 0.0 if disable_roll_pd else roll_cmd
             delta = applied_cmd - roll_offsets[leg]
             delta = max(-ROLL_STEP, min(ROLL_STEP, delta))
             if abs(delta) < 0.05:
@@ -2183,7 +1785,6 @@ while True:
 
         # ---------- PITCH REFLEX ----------
         # Knees flex/extend to shift vertical load
-
         for leg, ch in FEET.items():
             pitch_rate = gy / 131.0     # deg/s
             if abs(pitch_rate) < GYRO_RATE_DEADBAND:
@@ -2206,22 +1807,14 @@ while True:
 
             motion_offsets[leg] = max(-40.0, min(40.0, motion_offsets[leg]))
 
-            # ---------- Knee pump (action-level, symmetric) ----------
-            pump_offset = 0.0
-            if pump_active and not step_active and fsm_state == "IDLE":
-                pump_offset = knee_pump(time.time() - pump_start_time)
-
             angle = (
                 FOOT_STAND[leg]
                 + FOOT_SIGN[leg] * pitch_offsets[leg]
                 + motion_offsets[leg]
-                + pump_offset
                 + prop_target.get(leg, 0.0)
             )
 
-
             angle = max(FOOT_LIMITS[leg][0], min(FOOT_LIMITS[leg][1], angle))
-
             set_servo_angle(ch, angle)
             servo_angles[ch] = angle
         

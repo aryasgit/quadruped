@@ -10,8 +10,9 @@ ADDR = 0x40
 MODE1 = 0x00
 PRESCALE = 0xFE
 
-PULSE_MIN = 80
-PULSE_MAX = 561
+PULSE_MIN = 106
+PULSE_MAX = 535
+ANGLE_RANGE = 270.0   # ← REAL MEASURED RANGE
 
 bus = SMBus(BUS)
 
@@ -19,18 +20,18 @@ bus = SMBus(BUS)
 # SERVO MAPPING (Channel : Standing Angle)
 # ===============================
 SERVO_MAP = {
-    0: 38,   # RRS
-    1: 37,   # RLS
-    2: 102,   # RRM
-    3: 154,  # RLM
-    4: 142,  # RRF
-    5: 61,   # RLF
-    6: 37,   # FRS
-    7: 46,   # FLS
-    8: 85,   # FRM
-    9: 176,  # FLM
-    10: 137, # FRF
-    11: 61   # FLF
+    0: 38,
+    1: 37,
+    2: 102,
+    3: 154,
+    4: 142,
+    5: 61,
+    6: 37,
+    7: 46,
+    8: 85,
+    9: 176,
+    10: 137,
+    11: 61
 }
 
 SERVO_NAMES = [
@@ -39,18 +40,18 @@ SERVO_NAMES = [
 ]
 
 # ===============================
-# PCA FUNCTIONS (MUST COME FIRST)
+# PCA FUNCTIONS
 # ===============================
 def init_pca():
     bus.write_byte_data(ADDR, MODE1, 0x00)
     time.sleep(0.01)
 
     prescale = int(25000000 / (4096 * 50) - 1)
-    bus.write_byte_data(ADDR, MODE1, 0x10)  # sleep
+    bus.write_byte_data(ADDR, MODE1, 0x10)
     bus.write_byte_data(ADDR, PRESCALE, prescale)
     bus.write_byte_data(ADDR, MODE1, 0x00)
     time.sleep(0.005)
-    bus.write_byte_data(ADDR, MODE1, 0x80)  # restart
+    bus.write_byte_data(ADDR, MODE1, 0x80)
 
 
 def set_pulse(channel, pulse):
@@ -62,24 +63,23 @@ def set_pulse(channel, pulse):
 
 
 def angle_to_pulse(angle):
-    return int(PULSE_MIN + (angle / 270.0) * (PULSE_MAX - PULSE_MIN))
+    angle = max(0.0, min(ANGLE_RANGE, angle))  # safety clamp
+    return int(PULSE_MIN + (angle / ANGLE_RANGE) * (PULSE_MAX - PULSE_MIN))
 
 
 # ===============================
-# HARDWARE-ONLY SAFE START
+# SAFE START
 # ===============================
 def send_standing_pulses():
     for ch, angle in SERVO_MAP.items():
-        pulse = angle_to_pulse(angle)
-        set_pulse(ch, pulse)
+        set_pulse(ch, angle_to_pulse(angle))
 
 
 # ===============================
 # GUI CALLBACKS
 # ===============================
 def slider_callback(channel, val):
-    pulse = angle_to_pulse(float(val))
-    set_pulse(channel, pulse)
+    set_pulse(channel, angle_to_pulse(float(val)))
 
 
 def move_to_standing():
@@ -88,16 +88,16 @@ def move_to_standing():
 
 
 # ===============================
-# PROGRAM START (ORDER IS CRITICAL)
+# PROGRAM START
 # ===============================
 init_pca()
-send_standing_pulses()   # ← FIRST pulses servos ever see
+send_standing_pulses()
 
 # ===============================
 # GUI SETUP
 # ===============================
 root = tk.Tk()
-root.title("Quadruped Servo Control – PCA9685")
+root.title("Quadruped Servo Control – PCA9685 (302° Calibrated)")
 
 sliders = {}
 
@@ -111,7 +111,7 @@ for i in range(12):
     slider = tk.Scale(
         frame,
         from_=0,
-        to=270,
+        to=int(ANGLE_RANGE),   # ← 302°
         orient=tk.HORIZONTAL,
         length=300,
         command=lambda val, ch=i: slider_callback(ch, val)
@@ -120,11 +120,13 @@ for i in range(12):
 
     sliders[i] = slider
 
-# Sync GUI with already-set standing pose
 move_to_standing()
 
-btn = tk.Button(root, text="Move to Standing Position", command=move_to_standing)
+btn = tk.Button(
+    root,
+    text="Move to Standing Position",
+    command=move_to_standing
+)
 btn.grid(row=6, column=0, columnspan=2, pady=15)
 
 root.mainloop()
-
