@@ -31,6 +31,20 @@ PITCH_I_LIMIT = 12.0    # degrees-equivalent
 PITCH_CMD_LIMIT = 20.0 # max virtual pitch command
 
 # =====================
+# ROLL PID CONTROLLER
+# =====================
+ROLL_KP = 0.6
+ROLL_KI = 0.8
+ROLL_KD = 0.03
+
+_roll_i = 0.0
+_prev_roll = 0.0
+
+ROLL_I_LIMIT = 10.0
+ROLL_CMD_LIMIT = 30.0
+
+
+# =====================
 # GROUND PITCH ESTIMATOR
 # =====================
 pitch_ref = 0.0
@@ -54,7 +68,7 @@ X_REAR_GAIN  = 0.0005   # stronger
 
 
 def posture_step():
-    global pitch_ref, _pitch_i, _prev_pitch
+    global pitch_ref, _pitch_i, _prev_pitch, _roll_i, _prev_roll
     roll, pitch_meas, _, _ = imu.update()
     # ---------------------------
     # Ground pitch adaptation
@@ -87,12 +101,27 @@ def posture_step():
 
 
     pitch_cmd = max(min(pitch_cmd, PITCH_CMD_LIMIT), -PITCH_CMD_LIMIT)
+
+    # ---------------------------
+    # ROLL PID
+    # ---------------------------
+    roll_err = -roll  # roll_ref = 0 for now
+
+    _roll_i += roll_err * dt
+    _roll_i = max(min(_roll_i, ROLL_I_LIMIT), -ROLL_I_LIMIT)
+
+    roll_d = (roll_err - _prev_roll) / dt
+    _prev_roll = roll_err
+
+    roll_cmd = (
+        ROLL_KP * roll_err +
+        ROLL_KI * _roll_i +
+        ROLL_KD * roll_d
+    )
+
+    roll_cmd = max(min(roll_cmd, ROLL_CMD_LIMIT), -ROLL_CMD_LIMIT)
+
     DX_REAR_POLY = 0.0025 * pitch_cmd   # meters per degree
-
-
-
-    dz_left  = -ROLL_GAIN * roll
-    dz_right =  ROLL_GAIN * roll
 
     foot_targets = {
         "FL": ( 0.15,  0.05, BASE_Z),
@@ -125,6 +154,18 @@ def posture_step():
                             -DELTA_LIMITS["WRIST"])
 
     physical = normalize_all(deltas)
+    # ---------------------------------
+    # COXA ROLL ASSIST (VERY SMALL)
+    # ---------------------------------
+
+    COXA_ROLL_GAIN = 0.15   # deg per deg roll_cmd
+    cx = COXA_ROLL_GAIN * roll_cmd
+
+    physical["FL_COXA"] += cx
+    physical["RL_COXA"] += cx
+    physical["FR_COXA"] -= cx
+    physical["RR_COXA"] -= cx
+
 
     # ---------------------------------
     # POSTURE PITCH — JOINT SPACE ONLY
@@ -148,7 +189,43 @@ def posture_step():
     physical["RR_THIGH"] +=  k
     physical["RR_WRIST"] -= 1.2 * k
 
-    
+    # ---------------------------------
+    # POSTURE ROLL — JOINT SPACE ONLY
+    # ---------------------------------
+    kr = 3 * roll_cmd   # master roll gain
+
+    # Rear legs need LESS motion than front for same height change
+    REAR_SCALE = 1
+
+    # Convention:
+    # roll_cmd > 0  → left side DOWN
+    # → left EXTEND, right CONTRACT
+
+    # LEFT SIDE (extend)
+    physical["FL_THIGH"] +=  kr
+    physical["FL_WRIST"] -= 1.3 * kr
+
+    physical["RL_THIGH"] +=  REAR_SCALE * kr
+    physical["RL_WRIST"] -= 1.3 * REAR_SCALE * kr
+
+    # RIGHT SIDE (contract)
+    physical["FR_THIGH"] +=  kr
+    physical["FR_WRIST"] -= 1.3 * kr
+
+    physical["RR_THIGH"] +=  REAR_SCALE * kr
+    physical["RR_WRIST"] -= 1.3 * REAR_SCALE * kr
+
+
+
+
+    ROLL_SHAPE_LIMIT = 40.0
+
+    for j in physical:
+        if "THIGH" in j or "WRIST" in j:
+            physical[j] = max(
+                min(physical[j], physical[j] + ROLL_SHAPE_LIMIT),
+                physical[j] - ROLL_SHAPE_LIMIT
+            )
 
 
     for joint, angle in physical.items():
