@@ -45,36 +45,24 @@ If something is wrong here, symptoms look like:
 # They do NOT encode offsets or limits.
 
 JOINT_SIGN = {
-    # -----------------------------
-    # Coxa (already fixed)
-    # -----------------------------
+    # Coxa (yaw) — physical mirroring ONLY
     "FL_COXA": -1,
-    "RL_COXA": -1,
     "FR_COXA": +1,
+    "RL_COXA": -1,
     "RR_COXA": +1,
 
-    # -----------------------------
-    # Thigh (THIS IS THE FIX)
-    # -----------------------------
+    # Thigh (pitch) — SAME SIGN FOR ALL
     "FL_THIGH": +1,
-    "RL_THIGH": +1,   # LEFT thighs: as-is
+    "FR_THIGH": +1,
+    "RL_THIGH": +1,
+    "RR_THIGH": +1,
 
-    "FR_THIGH": -1,
-    "RR_THIGH": -1,   # RIGHT thighs: inverted
-
-    # -----------------------------
-    # Wrist (knee) — mirrored joints
-    # -----------------------------
+    # Wrist (knee) — SAME SIGN FOR ALL
     "FL_WRIST": +1,
-    "RL_WRIST": +1,   # LEFT wrists: as-is
-
-    "FR_WRIST": -1,
-    "RR_WRIST": -1,   # RIGHT wrists: invert
-
+    "FR_WRIST": +1,
+    "RL_WRIST": +1,
+    "RR_WRIST": +1,
 }
-
-
-
 
 
 # =================================================
