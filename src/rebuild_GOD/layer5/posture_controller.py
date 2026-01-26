@@ -32,6 +32,16 @@ _pitch_filt = 0.0
 PITCH_I_LIMIT = 12.0    # degrees-equivalent
 PITCH_CMD_LIMIT = 20.0 # max virtual pitch command
 
+# =====================
+# ROLL PD CONTROLLER (NO INTEGRAL)
+# =====================
+ROLL_KP = 0.6
+ROLL_KD = 0.03
+
+_prev_roll = 0.0
+ROLL_CMD_LIMIT = 20.0
+
+
 
 # =====================
 # GROUND PITCH ESTIMATOR
@@ -57,8 +67,24 @@ X_REAR_GAIN  = 0.0005   # stronger
 
 
 def posture_step():
-    global pitch_ref, _pitch_i, _prev_pitch
+    global pitch_ref, _pitch_i, _prev_pitch, _prev_roll
     roll, pitch_meas, _, _ = imu.update()
+    # ---------------------------
+    # ROLL PD (NO INTEGRAL)
+    # ---------------------------
+    roll_err = -roll        # roll_ref = 0
+    dt = 0.02
+
+    roll_d = (roll_err - _prev_roll) / dt
+    _prev_roll = roll_err
+
+    roll_cmd = (
+        ROLL_KP * roll_err +
+        ROLL_KD * roll_d
+    )
+
+    roll_cmd = max(min(roll_cmd, ROLL_CMD_LIMIT), -ROLL_CMD_LIMIT)
+
     global _pitch_filt
     alpha = 0.85   # strong smoothing, still responsive
     _pitch_filt = alpha * _pitch_filt + (1 - alpha) * pitch_meas
@@ -137,6 +163,16 @@ def posture_step():
 
     physical = normalize_all(deltas)
 
+    # -------------------------------
+    # HARD ZERO COXA FOR POSTURE MODE
+    # -------------------------------
+    physical["FL_COXA"] = 0.0
+    physical["FR_COXA"] = 0.0
+    physical["RL_COXA"] = 0.0
+    physical["RR_COXA"] = 0.0
+
+
+
     # ---------------------------------
     # POSTURE PITCH — JOINT SPACE ONLY
     # (DO NOT GO THROUGH IK)
@@ -159,7 +195,37 @@ def posture_step():
     physical["RR_THIGH"] +=  k
     physical["RR_WRIST"] -= 1.2 * k
 
-    SERVO_DEADBAND = 0.3  # degrees
+    # ---------------------------------
+    # POSTURE ROLL — JOINT SPACE ONLY
+    # ---------------------------------
+    kr= 1.5 * roll_cmd * min(1.0, abs(roll_cmd) / 5.0)    # conservative, safe
+
+    REAR_SCALE = 1.0       # symmetric support polygon
+
+    EXT_GAIN = 1.2
+    CON_GAIN = 2.2    # <-- THIS is the fix
+    WRIST_EXT = 1.6
+    WRIST_CON = 2.1
+
+    # roll_cmd > 0 → left side DOWN
+
+    # LEFT SIDE (EXTEND)
+    physical["FL_THIGH"] += EXT_GAIN * kr
+    physical["FL_WRIST"] -= WRIST_EXT * kr
+
+    physical["RL_THIGH"] += EXT_GAIN * REAR_SCALE * kr
+    physical["RL_WRIST"] -= WRIST_EXT * REAR_SCALE * kr
+
+    # RIGHT SIDE (CONTRACT HARDER)
+    physical["FR_THIGH"] += CON_GAIN * kr
+    physical["FR_WRIST"] -= WRIST_CON * kr
+
+    physical["RR_THIGH"] += CON_GAIN * REAR_SCALE * kr
+    physical["RR_WRIST"] -= WRIST_CON * REAR_SCALE * kr
+
+
+
+    SERVO_DEADBAND = 3  # degrees
     for joint, angle in physical.items():
         if abs(angle) < SERVO_DEADBAND:
             continue
