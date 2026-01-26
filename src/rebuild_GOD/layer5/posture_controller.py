@@ -22,27 +22,15 @@ from hardware.absolute_truths import WRISTS, THIGHS, COXA, BUS
 # =====================
 PITCH_KP = 0.6
 PITCH_KI = 0.8
-PITCH_KD = 0.04
+PITCH_KD = 0.03
 
 _pitch_i = 0.0
 _prev_pitch = 0.0
+_pitch_filt = 0.0
+
 
 PITCH_I_LIMIT = 12.0    # degrees-equivalent
 PITCH_CMD_LIMIT = 20.0 # max virtual pitch command
-
-# =====================
-# ROLL PID CONTROLLER
-# =====================
-ROLL_KP = 0.6
-ROLL_KI = 0.8
-ROLL_KD = 0.03
-
-_roll_i = 0.0
-_prev_roll = 0.0
-
-ROLL_I_LIMIT = 10.0
-ROLL_CMD_LIMIT = 30.0
-
 
 # =====================
 # GROUND PITCH ESTIMATOR
@@ -68,8 +56,13 @@ X_REAR_GAIN  = 0.0005   # stronger
 
 
 def posture_step():
-    global pitch_ref, _pitch_i, _prev_pitch, _roll_i, _prev_roll
+    global pitch_ref, _pitch_i, _prev_pitch
     roll, pitch_meas, _, _ = imu.update()
+    global _pitch_filt
+    alpha = 0.85   # strong smoothing, still responsive
+    _pitch_filt = alpha * _pitch_filt + (1 - alpha) * pitch_meas
+    pitch_meas = _pitch_filt
+
     # ---------------------------
     # Ground pitch adaptation
     # ---------------------------
@@ -85,11 +78,14 @@ def posture_step():
     dt = 0.02
 
     # Integrator
-    _pitch_i += pitch_err * dt
-    _pitch_i = max(min(_pitch_i, PITCH_I_LIMIT), -PITCH_I_LIMIT)
+    if abs(pitch_err) > 0.8:   # degrees
+        _pitch_i += 0.7*pitch_err * dt
+        _pitch_i = max(min(_pitch_i, PITCH_I_LIMIT), -PITCH_I_LIMIT)
+
 
     # Derivative
     pitch_d = (pitch_err - _prev_pitch) / dt
+    pitch_d = max(min(pitch_d, 40.0), -40.0)
     _prev_pitch = pitch_err
 
     # PID output
@@ -101,27 +97,12 @@ def posture_step():
 
 
     pitch_cmd = max(min(pitch_cmd, PITCH_CMD_LIMIT), -PITCH_CMD_LIMIT)
-
-    # ---------------------------
-    # ROLL PID
-    # ---------------------------
-    roll_err = -roll  # roll_ref = 0 for now
-
-    _roll_i += roll_err * dt
-    _roll_i = max(min(_roll_i, ROLL_I_LIMIT), -ROLL_I_LIMIT)
-
-    roll_d = (roll_err - _prev_roll) / dt
-    _prev_roll = roll_err
-
-    roll_cmd = (
-        ROLL_KP * roll_err +
-        ROLL_KI * _roll_i +
-        ROLL_KD * roll_d
-    )
-
-    roll_cmd = max(min(roll_cmd, ROLL_CMD_LIMIT), -ROLL_CMD_LIMIT)
-
     DX_REAR_POLY = 0.0025 * pitch_cmd   # meters per degree
+
+
+
+    dz_left  = -ROLL_GAIN * roll
+    dz_right =  ROLL_GAIN * roll
 
     foot_targets = {
         "FL": ( 0.15,  0.05, BASE_Z),
@@ -154,25 +135,13 @@ def posture_step():
                             -DELTA_LIMITS["WRIST"])
 
     physical = normalize_all(deltas)
-    # ---------------------------------
-    # COXA ROLL ASSIST (VERY SMALL)
-    # ---------------------------------
-
-    COXA_ROLL_GAIN = 0.15   # deg per deg roll_cmd
-    cx = COXA_ROLL_GAIN * roll_cmd
-
-    physical["FL_COXA"] += cx
-    physical["RL_COXA"] += cx
-    physical["FR_COXA"] -= cx
-    physical["RR_COXA"] -= cx
-
 
     # ---------------------------------
     # POSTURE PITCH — JOINT SPACE ONLY
     # (DO NOT GO THROUGH IK)
     # ---------------------------------
 
-    k = 1.5 * pitch_cmd   # degrees per degree
+    k = 2 * pitch_cmd * min(1.0, abs(pitch_cmd) / 5.0)
 
     # LEFT SIDE
     physical["FL_THIGH"] +=  0.6 * k
@@ -189,47 +158,18 @@ def posture_step():
     physical["RR_THIGH"] +=  k
     physical["RR_WRIST"] -= 1.2 * k
 
-    # ---------------------------------
-    # POSTURE ROLL — JOINT SPACE ONLY
-    # ---------------------------------
-    kr = 3 * roll_cmd   # master roll gain
-
-    # Rear legs need LESS motion than front for same height change
-    REAR_SCALE = 1
-
-    # Convention:
-    # roll_cmd > 0  → left side DOWN
-    # → left EXTEND, right CONTRACT
-
-    # LEFT SIDE (extend)
-    physical["FL_THIGH"] +=  kr
-    physical["FL_WRIST"] -= 1.3 * kr
-
-    physical["RL_THIGH"] +=  REAR_SCALE * kr
-    physical["RL_WRIST"] -= 1.3 * REAR_SCALE * kr
-
-    # RIGHT SIDE (contract)
-    physical["FR_THIGH"] +=  kr
-    physical["FR_WRIST"] -= 1.3 * kr
-
-    physical["RR_THIGH"] +=  REAR_SCALE * kr
-    physical["RR_WRIST"] -= 1.3 * REAR_SCALE * kr
-
-
-
-
-    ROLL_SHAPE_LIMIT = 40.0
+    
 
     for j in physical:
-        if "THIGH" in j or "WRIST" in j:
-            physical[j] = max(
-                min(physical[j], physical[j] + ROLL_SHAPE_LIMIT),
-                physical[j] - ROLL_SHAPE_LIMIT
-            )
+        if abs(physical[j] - physical[j]) < 0.3:
+            continue
 
-
+    SERVO_DEADBAND = 0.3  # degrees
     for joint, angle in physical.items():
+        if abs(angle) < SERVO_DEADBAND:
+            continue
         set_servo_angle(SERVO_CHANNELS[joint], angle)
+
 
 if __name__ == "__main__":
     print("[L5] IMU posture control test — HOLD ROBOT")
