@@ -32,6 +32,7 @@ _pitch_filt = 0.0
 PITCH_I_LIMIT = 12.0    # degrees-equivalent
 PITCH_CMD_LIMIT = 20.0 # max virtual pitch command
 
+
 # =====================
 # GROUND PITCH ESTIMATOR
 # =====================
@@ -157,12 +158,6 @@ def posture_step():
 
     physical["RR_THIGH"] +=  k
     physical["RR_WRIST"] -= 1.2 * k
-
-    
-
-    for j in physical:
-        if abs(physical[j] - physical[j]) < 0.3:
-            continue
 
     SERVO_DEADBAND = 0.3  # degrees
     for joint, angle in physical.items():
