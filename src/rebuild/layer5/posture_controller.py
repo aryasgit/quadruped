@@ -1,3 +1,4 @@
+#layer5/posture_controller.py
 import time
 
 from hardware.imu import (
@@ -11,11 +12,26 @@ calib = calibrate()
 imu = IMUFilter(calib)
 
 
+
 from layer3.leg_ik import solve_all_legs
 from layer2.joint_conventions import apply_joint_conventions
 from layer2.joint_space import normalize_all
+from layer7.leg_fsm import LegFSM
+from layer8.gait_phase import GaitPhase
 from hardware.pca9685 import set_servo_angle
 from hardware.absolute_truths import WRISTS, THIGHS, COXA, BUS
+
+leg_fsm = LegFSM()
+gait = GaitPhase(swing_duration=0.6, lift_height=0.035)
+
+foot_contact = {
+    "FL": True,
+    "FR": True,
+    "RL": True,
+    "RR": True,
+}
+
+
 
 # =====================
 # PITCH PID CONTROLLER
@@ -51,6 +67,11 @@ pitch_ref = 0.0
 PITCH_REF_ADAPT_RATE = 0.02   # deg/sec
 PITCH_REF_MAX = 20.0          # safety
 
+# =====================
+# LAYER 6 INPUTS (AUTHORITATIVE)
+# =====================
+POSTURE_ENABLED = True
+ALLOW_PITCH_REF_ADAPT = True
 
 SERVO_CHANNELS = {
     "FL_COXA": COXA["FL"], "FL_THIGH": THIGHS["TFL"], "FL_WRIST": WRISTS["WFL"],
@@ -68,7 +89,10 @@ X_REAR_GAIN  = 0.0005   # stronger
 
 def posture_step():
     global pitch_ref, _pitch_i, _prev_pitch, _prev_roll
+    if not POSTURE_ENABLED:
+        return
     roll, pitch_meas, _, _ = imu.update()
+    
     # ---------------------------
     # ROLL PD (NO INTEGRAL)
     # ---------------------------
@@ -95,9 +119,10 @@ def posture_step():
     # ---------------------------
     pitch_error_raw = pitch_meas - pitch_ref
 
-    # Adapt reference ONLY when robot is quiet (important)
-    pitch_ref += PITCH_REF_ADAPT_RATE * pitch_error_raw * 0.02
-    pitch_ref = max(min(pitch_ref, PITCH_REF_MAX), -PITCH_REF_MAX)
+    if ALLOW_PITCH_REF_ADAPT:
+        pitch_ref += PITCH_REF_ADAPT_RATE * pitch_error_raw * 0.02
+        pitch_ref = max(min(pitch_ref, PITCH_REF_MAX), -PITCH_REF_MAX)
+
 
     # Final control error
     pitch_err = pitch_meas - pitch_ref
@@ -143,7 +168,44 @@ def posture_step():
 
     
     deltas = solve_all_legs(foot_targets)
+    # =========================
+    # LAYER 8 — INJECT LIFT INTO DELTAS (PRE-NORMALIZATION)
+    # =========================
+    if leg_fsm.active_leg:
+        dz = gait.lift()
+        leg = leg_fsm.active_leg
+
+        phase = gait.phase   # 0 → 1
+
+        # PRIMARY vertical lift
+        WRIST_LIFT_DEG = 30.0 * phase
+
+        # VERY SMALL thigh bias to avoid singularity
+        THIGH_LIFT_DEG = 6.0 * phase
+
+        if leg == "FL":
+            deltas["FL_THIGH"] -= THIGH_LIFT_DEG   # NOTE SIGN
+            deltas["FL_WRIST"] += WRIST_LIFT_DEG
+
+        elif leg == "FR":
+            deltas["FR_THIGH"] += THIGH_LIFT_DEG   # NOTE SIGN
+            deltas["FR_WRIST"] -= WRIST_LIFT_DEG
+
+        elif leg == "RL":
+            deltas["RL_THIGH"] -= THIGH_LIFT_DEG   # NOTE SIGN
+            deltas["RL_WRIST"] += WRIST_LIFT_DEG
+
+        elif leg == "RR":
+            deltas["RR_THIGH"] += THIGH_LIFT_DEG   # NOTE SIGN
+            deltas["RR_WRIST"] -= WRIST_LIFT_DEG
+
+
+        if phase > 0.2:
+            foot_contact[leg] = False
     deltas = apply_joint_conventions(deltas)
+    
+
+
     DELTA_LIMITS = {
         "COXA": 20.0,
         "THIGH": 50.0,
@@ -162,16 +224,13 @@ def posture_step():
                             -DELTA_LIMITS["WRIST"])
 
     physical = normalize_all(deltas)
-
     # -------------------------------
     # HARD ZERO COXA FOR POSTURE MODE
     # -------------------------------
-    physical["FL_COXA"] = 0.0
-    physical["FR_COXA"] = 0.0
-    physical["RL_COXA"] = 0.0
-    physical["RR_COXA"] = 0.0
-
-
+    physical["FL_COXA"] = 45.0
+    physical["FR_COXA"] = 45.0
+    physical["RL_COXA"] = 45.0
+    physical["RR_COXA"] = 45.0
 
     # ---------------------------------
     # POSTURE PITCH — JOINT SPACE ONLY
@@ -225,16 +284,63 @@ def posture_step():
 
 
 
-    SERVO_DEADBAND = 3  # degrees
-    for joint, angle in physical.items():
-        if abs(angle) < SERVO_DEADBAND:
-            continue
-        set_servo_angle(SERVO_CHANNELS[joint], angle)
+    return physical
+
+
 
 
 if __name__ == "__main__":
     print("[L5] IMU posture control test — HOLD ROBOT")
 
     while True:
-        posture_step()
-        time.sleep(0.02)   # ~50 Hz
+        print("FSM active leg:", leg_fsm.active_leg)
+
+
+        # =========================
+        # LAYER 7 — LEG FSM
+        # =========================
+        leg_fsm.update(
+            allow_leg_lift=True,     # forced ON for diagnostics
+            foot_contact=foot_contact,
+            swing_done=False,
+            load_done=True,
+        )
+
+        # =========================
+        # LAYER 8 — GAIT PHASE
+        # =========================
+        if leg_fsm.active_leg and gait._t0 is None:
+            gait.start()
+
+        phase, swing_done = gait.update()
+
+        # =========================
+        # LAYER 5 — POSTURE (AFTER GAIT UPDATE)
+        # =========================
+        physical = posture_step()
+        if physical is None:
+            time.sleep(0.02)
+            continue
+
+        # =========================
+        # FSM COMPLETION
+        # =========================
+        if swing_done and leg_fsm.active_leg:
+            foot_contact[leg_fsm.active_leg] = True
+            gait.reset()
+
+            leg_fsm.update(
+                allow_leg_lift=True,
+                foot_contact=foot_contact,
+                swing_done=True,
+                load_done=True,
+            )
+        
+        # =========================
+        # FINAL ACTUATION (ABSOLUTE)
+        # =========================
+        for joint, angle in physical.items():
+            set_servo_angle(SERVO_CHANNELS[joint], angle)
+
+
+        time.sleep(0.02)
