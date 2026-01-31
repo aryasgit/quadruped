@@ -63,46 +63,43 @@ def solve_leg_ik(x, y, z, side):
     theta_coxa = max(min(theta_coxa, 30.0), -30.0)
 
     # -------------------------------------------------
-    # THIGH — PLANAR IK (x–z)
+    # SAFE PLANAR IK (PHASE B — LINEAR, LOW GAIN)
     # -------------------------------------------------
-    # Link lengths (meters)
-    L1 = 0.108   # thigh
-    L2 = 0.138   # shin (unused for now)
 
-    # Effective reach in sagittal plane
-    r = math.sqrt(x*x + z*z)
-
-    # Safety clamp (geometry only)
-    r = max(min(r, L1 + L2 - 1e-3), abs(L1 - L2) + 1e-3)
-
-    # Thigh angle: point leg toward foot in x–z plane
-    # delta z from stand (positive = want to go down)
+    # Reference stand height
     STAND_Z = -0.18
+
+    # Vertical error (meters)
     dz = z - STAND_Z
 
-    THIGH_GAIN = -220.0   # deg per meter (now safe)
-    theta_thigh = THIGH_GAIN * dz
-    theta_thigh = max(min(theta_thigh, 45.0), -45.0)
+    # Horizontal bias (meters)
+    dx = x - 0.15   # front legs reference
+    if side == 'R':
+        dx = -dx    # mirror
 
+    # ----------------------------
+    # VERY SMALL GAINS (SAFE)
+    # ----------------------------
+    THIGH_Z_GAIN  = -80.0    # deg / meter  (START SAFE)
+    WRIST_Z_GAIN  = -90.0   # deg / meter
+    THIGH_X_GAIN  = -30.0
+    WRIST_X_GAIN  = +40.0
 
+    theta_thigh = (
+        THIGH_Z_GAIN * dz +
+        THIGH_X_GAIN * dx
+    )
 
-    # -------------------------------------------------
-    # WRIST — LOCKED
-    # -------------------------------------------------
-    # -------------------------------------------------
-    # WRIST — COMPLEMENT THIGH (TEMPORARY)
-    # -------------------------------------------------
-    # -------------------------------------------------
-    # WRIST — KNEE COMPENSATION FOR VERTICAL MOTION
-    # -------------------------------------------------
+    theta_wrist = (
+        WRIST_Z_GAIN * dz +
+        WRIST_X_GAIN * dx
+    )
 
-    # Wrist bends forward more than thigh bends back
-    WRIST_GAIN = -1.6    # stronger than thigh
-    theta_wrist = WRIST_GAIN * abs(theta_thigh)
-
-    theta_wrist = max(min(theta_wrist, 60.0), -60.0)
-
-
+    # ----------------------------
+    # HARD SAFETY CLAMPS
+    # ----------------------------
+    theta_thigh = max(min(theta_thigh, 15.0), -15.0)
+    theta_wrist = max(min(theta_wrist, 20.0), -20.0)
 
     return theta_coxa, theta_thigh, theta_wrist
 

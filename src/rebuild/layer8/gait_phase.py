@@ -3,7 +3,7 @@ import math
 
 
 class GaitPhase:
-    def __init__(self, swing_duration=0.6, lift_height=0.015):
+    def __init__(self, swing_duration=0.9, lift_height=0.015):
         self.swing_duration = swing_duration
         self.lift_height = lift_height
         self._t0 = None
