@@ -1,7 +1,7 @@
 # controller.py
 import time
 
-from layer5.posture_controller import posture_step
+from layer5.posture_controller_gait_only import posture_step
 from layer7.leg_fsm import LegFSM
 from layer8.gait_phase import GaitPhase
 from layer9.swing_trajectory import SwingTrajectory
@@ -20,16 +20,16 @@ SERVO_CHANNELS = {
 # ------------------------
 leg_fsm = LegFSM()
 gait = GaitPhase(swing_duration=0.6)
-swing = SwingTrajectory(step_length=0.05, step_height=0.035)
+swing = SwingTrajectory(step_length=0.2, step_height=0.140)
 
 foot_contact = {l: True for l in ["FL", "FR", "RL", "RR"]}
 
 # Nominal stance (LOCKED)
 STANCE = {
-    "FL": (0.15,  0.05, -0.18),
-    "FR": (0.15, -0.05, -0.18),
-    "RL": (-0.15,  0.05, -0.18),
-    "RR": (-0.15, -0.05, -0.18),
+    "FL": ( 0.20,  0.07, -0.18),
+    "FR": ( 0.20, -0.07, -0.18),
+    "RL": (-0.20,  0.07, -0.18),
+    "RR": (-0.20, -0.07, -0.18),
 }
 
 # ------------------------
@@ -65,6 +65,33 @@ while True:
         if dz > 0.01:
             foot_contact[leg] = False
 
+    # --- DIAGNOSTIC PRINTS (temporary) ---
+    # Print foot_targets in meters
+    for leg in ("FL","FR","RL","RR"):
+        x,y,z = foot_targets[leg]
+        print(f"FT {leg} x={x:.3f} y={y:.3f} z={z:.3f}", end=" | ")
+    print()
+
+    # Call IK directly per-leg (if your solve_all_legs wrapper exists, print its output)
+    from layer3.leg_ik import solve_all_legs  # ok, already used in posture_step alt
+    raw_deltas = solve_all_legs(foot_targets)
+    print("RAW IK DELTAS:", {k: round(v,4) for k,v in raw_deltas.items()})
+
+    # If you have apply_joint_conventions now
+    from layer2.joint_conventions import apply_joint_conventions
+    conv = apply_joint_conventions(raw_deltas)
+    print("AFTER_CONV:", {k: round(v,4) for k,v in conv.items()})
+
+    # After any mirroring logic (if present in alt layer5)
+    # and after normalize_all (physical map)
+    from layer2.joint_space import normalize_all
+    phys = normalize_all(conv)
+    print("PHYSICAL ANGLES (deg):", {k: round(v,3) for k,v in phys.items()})
+
+    # Print coxa lock if applied
+    if "FL_COXA" in phys:
+        print("COXA (deg):", phys["FL_COXA"], phys["FR_COXA"], phys["RL_COXA"], phys["RR_COXA"])
+    # --- end diagnostics ---
 
     # ---- Posture + IK (Layer 5) ----
     physical = posture_step(foot_targets)

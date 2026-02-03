@@ -4,18 +4,12 @@ Layer 3 — LEG INVERSE KINEMATICS (IK)
 
 Pure math. Zero hardware. Zero servos. Zero balance.
 
-This file is a CLEAN extraction of the SpotMicro leg IK logic.
-It answers ONE question:
+Contract:
+- Input foot positions are HIP-LOCAL (not body-frame)
+- Output angles are DELTAS (0 = stand pose)
+- Units: degrees
 
-    Given a desired foot position relative to the hip,
-    what are the joint angle DELTAS (coxa, thigh, wrist)?
-
-Outputs are:
-- degrees
-- delta angles (0 = stand reference)
-- directly consumable by Layer 2 (joint_space)
-
-Coordinate convention (matches SpotMicro):
+Coordinate convention:
 - x : forward (+)
 - y : left (+)
 - z : up (+)
@@ -23,19 +17,46 @@ Coordinate convention (matches SpotMicro):
 
 import math
 
-L1 = 0.10832   # thigh length (meters)
-L2 = 0.13476   # foreleg length (meters)
-
-
 # -------------------------------------------------
-# Geometry constants (SpotMicro dimensions, meters)
+# Geometry constants (SpotMicro, meters)
 # -------------------------------------------------
-# These values are taken directly from the SpotMicro
-# inverse kinematics reference implementation.
 
 L0 = 0.055   # Coxa length (hip offset)
-L1 = 0.107  # Thigh length
-L2 = 0.130  # Wrist / shin length
+L1 = 0.107   # Thigh length
+L2 = 0.130   # Wrist / shin length
+
+# -------------------------------------------------
+# Stand pose (HIP-LOCAL)
+# -------------------------------------------------
+# This MUST match your controller STANCE Z
+STAND_Z = -0.18
+STAND_DX = 0.0   # foot directly under hip in X at stand
+
+# -------------------------------------------------
+# Precompute stand reference angles (ONCE)
+# -------------------------------------------------
+
+def _compute_stand_angles():
+    dx = STAND_DX
+    dz = STAND_Z
+
+    r = math.sqrt(dx*dx + dz*dz)
+    r = max(min(r, L1 + L2 - 1e-6), abs(L1 - L2) + 1e-6)
+
+    cos_knee = (L1*L1 + L2*L2 - r*r) / (2*L1*L2)
+    knee = math.acos(cos_knee)
+
+    alpha = math.atan2(dz, dx)
+    cos_beta = (L1*L1 + r*r - L2*L2) / (2*L1*r)
+    beta = math.acos(cos_beta)
+
+    thigh = alpha - beta
+    wrist = math.pi - knee
+
+    return thigh, wrist
+
+
+THIGH_0_RAD, WRIST_0_RAD = _compute_stand_angles()
 
 # -------------------------------------------------
 # Core leg IK solver
@@ -43,112 +64,95 @@ L2 = 0.130  # Wrist / shin length
 
 def solve_leg_ik(x, y, z, side):
     """
-    Layer 3 — THIGH BRING-UP MODE
+    Inputs:
+        x, y, z : HIP-LOCAL foot target (meters)
+        side    : 'L' or 'R'
 
-    COXA  : lateral-only (already fixed)
-    THIGH : planar x–z IK
-    WRIST : locked at 0
+    Returns:
+        (theta_coxa, theta_thigh, theta_wrist) in DEGREES
+        All are DELTAS relative to stand pose
     """
 
-    import math
-
-    # -------------------------------------------------
-    # COXA — LATERAL ONLY (already verified)
-    # -------------------------------------------------
+    # ---------------- COXA (lateral only) ----------------
     if side == 'R':
         y = -y
 
-    COXA_GAIN = 120.0        # degrees per meter (safe)
-    theta_coxa = COXA_GAIN * y
+    theta_coxa = 120.0 * y
     theta_coxa = max(min(theta_coxa, 30.0), -30.0)
 
-    # -------------------------------------------------
-    # SAFE PLANAR IK (PHASE B — LINEAR, LOW GAIN)
-    # -------------------------------------------------
+    # ---------------- PLANAR IK (x–z) ----------------
+    dx = x
+    dz = z
 
-    # Reference stand height
-    STAND_Z = -0.18
-
-    # Vertical error (meters)
-    dz = z - STAND_Z
-
-    # Horizontal bias (meters)
-    dx = x - 0.15   # front legs reference
     if side == 'R':
-        dx = -dx    # mirror
+        dx = -dx
 
-    # ----------------------------
-    # VERY SMALL GAINS (SAFE)
-    # ----------------------------
-    THIGH_Z_GAIN  = -80.0    # deg / meter  (START SAFE)
-    WRIST_Z_GAIN  = -90.0   # deg / meter
-    THIGH_X_GAIN  = -30.0
-    WRIST_X_GAIN  = +40.0
+    r = math.sqrt(dx*dx + dz*dz)
+    r = max(min(r, L1 + L2 - 1e-6), abs(L1 - L2) + 1e-6)
 
-    theta_thigh = (
-        THIGH_Z_GAIN * dz +
-        THIGH_X_GAIN * dx
-    )
+    cos_knee = (L1*L1 + L2*L2 - r*r) / (2*L1*L2)
+    knee = math.acos(cos_knee)
 
-    theta_wrist = (
-        WRIST_Z_GAIN * dz +
-        WRIST_X_GAIN * dx
-    )
+    alpha = math.atan2(dz, dx)
+    cos_beta = (L1*L1 + r*r - L2*L2) / (2*L1*r)
+    beta = math.acos(cos_beta)
 
-    # ----------------------------
-    # HARD SAFETY CLAMPS
-    # ----------------------------
-    theta_thigh = max(min(theta_thigh, 15.0), -15.0)
-    theta_wrist = max(min(theta_wrist, 20.0), -20.0)
+    thigh = alpha - beta
+    wrist = math.pi - knee
+
+    # ---------------- DELTA FROM STAND ----------------
+    theta_thigh = math.degrees(thigh - THIGH_0_RAD)
+    theta_wrist = math.degrees(wrist - WRIST_0_RAD)
+
+    # ---------------- SAFETY CLAMPS ----------------
+    theta_thigh = max(min(theta_thigh, 45.0), -45.0)
+    theta_wrist = max(min(theta_wrist, 70.0), -70.0)
 
     return theta_coxa, theta_thigh, theta_wrist
 
 
-
 # -------------------------------------------------
-# Convenience: solve all 4 legs
+# Solve all legs
 # -------------------------------------------------
 
 def solve_all_legs(foot_targets: dict):
     """
-    foot_targets example:
+    foot_targets:
     {
         'FL': (x, y, z),
         'FR': (x, y, z),
-        'RR': (x, y, z),
         'RL': (x, y, z),
+        'RR': (x, y, z),
     }
-
-    Returns:
-        dict mapping joint_name -> delta_angle
     """
     out = {}
 
     for leg, (x, y, z) in foot_targets.items():
         side = 'L' if leg in ('FL', 'RL') else 'R'
-        d_coxa, d_thigh, d_wrist = solve_leg_ik(x, y, z, side)
+        coxa, thigh, wrist = solve_leg_ik(x, y, z, side)
 
-        out[f"{leg}_COXA"]  = d_coxa
-        out[f"{leg}_THIGH"] = d_thigh
-        out[f"{leg}_WRIST"] = d_wrist
+        out[f"{leg}_COXA"]  = coxa
+        out[f"{leg}_THIGH"] = thigh
+        out[f"{leg}_WRIST"] = wrist
 
     return out
 
 
 # -------------------------------------------------
-# Smoke test (math only)
+# Smoke test
 # -------------------------------------------------
 
 if __name__ == "__main__":
-    # Simple neutral test: foot straight down
+
+    # Hip-local neutral stance
     test_targets = {
-        'FL': (0.15,  0.05, -0.18),
-        'FR': (0.15, -0.05, -0.18),
-        'RR': (-0.15, -0.05, -0.18),
-        'RL': (-0.15,  0.05, -0.18),
+        'FL': (0.0,  0.07, -0.18),
+        'FR': (0.0, -0.07, -0.18),
+        'RL': (0.0,  0.07, -0.18),
+        'RR': (0.0, -0.07, -0.18),
     }
 
     res = solve_all_legs(test_targets)
-    print("[L3] IK delta outputs:")
+    print("[L3] IK delta outputs (stand):")
     for k, v in res.items():
-        print(f"{k:10s} -> {v:+7.2f}°")
+        print(f"{k:10s} -> {v:+7.3f}°")
