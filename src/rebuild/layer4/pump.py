@@ -1,12 +1,17 @@
 """
-All-legs mirrored XYZ test
+All-legs XYZ symmetry test (POST-CONVENTIONS)
 
 Behavior:
- - Left legs (FL, RL) follow the base + offset
- - Right legs (FR, RR) follow the base - offset (exact inverse)
- - Offsets applied to X, Y, Z components (mirrored across the body)
- - Uses solve_leg_ik(...) -> conventions -> normalize_all -> set_servo_angle
- - Slow sine motion, safe defaults
+ - ALL legs receive the SAME hip-local XYZ offsets
+ - Left/right differences handled ONLY by:
+     • base Y sign
+     • Layer 2.5 joint conventions
+ - NO mirroring hacks
+ - NO per-leg sign flips
+
+This test VALIDATES that:
+ - Layer 6/3 math is symmetric
+ - Layer 2.5 fixes real hardware mirroring
 """
 
 import time
@@ -24,13 +29,6 @@ LEGS = ["FL", "FR", "RL", "RR"]
 THIGH_MAP = {"FL": "TFL", "FR": "TFR", "RL": "TRL", "RR": "TRR"}
 WRIST_MAP = {"FL": "WFL", "FR": "WFR", "RL": "WRL", "RR": "WRR"}
 
-# Sign multiplier: left = +1, right = -1
-SIDE_SIGN = {
-    "FL": +1,
-    "RL": +1,
-    "FR": -1,
-    "RR": -1,
-}
 
 def send_leg_xyz(leg, x, y, z):
     # Solve IK (returns deltas in degrees)
@@ -42,7 +40,7 @@ def send_leg_xyz(leg, x, y, z):
         f"{leg}_WRIST": wrist,
     }
 
-    # Conventions + normalize
+    # Apply canonical conventions
     deltas = apply_joint_conventions(deltas)
     physical = normalize_all(deltas)
 
@@ -55,39 +53,37 @@ def send_leg_xyz(leg, x, y, z):
 def main():
     # Base hip-local positions (meters)
     BASE_X = 0.0
+    BASE_Z = -0.18
+
     BASE_Y = {
         "FL":  0.06,
         "FR": -0.06,
         "RL":  0.06,
         "RR": -0.06,
     }
-    BASE_Z = -0.18
 
-    # Offsets amplitude (meters) for each axis
-    AMP_X = 0.02   # forward/back
-    AMP_Y = 0.01   # left/right
-    AMP_Z = 0.02   # up/down
+    # Offset amplitudes (meters)
+    AMP_X = 0.02
+    AMP_Y = 0.01
+    AMP_Z = 0.05
 
-    FREQ = 0.25    # Hz (slow and safe)
-    DT = 0.03      # control loop step
+    FREQ = 0.25
+    DT = 0.03
 
     t = 0.0
-    print("Running ALL-LEGS MIRRORED XYZ test — CTRL+C to stop")
+    print("Running ALL-LEGS XYZ symmetry test — CTRL+C to stop")
 
     try:
         while True:
-            # base sinusoidal offsets (same for all legs, mirrored by SIDE_SIGN)
+            # SAME offsets for ALL legs
             off_x = AMP_X * math.sin(2 * math.pi * FREQ * t)
             off_y = AMP_Y * math.sin(2 * math.pi * FREQ * t)
             off_z = AMP_Z * math.sin(2 * math.pi * FREQ * t)
 
             for leg in LEGS:
-                sign = SIDE_SIGN[leg]
-
-                # Apply inverse for right legs by multiplying offset by sign
-                x = BASE_X + sign * off_x
-                y = BASE_Y[leg] + sign * off_y
-                z = BASE_Z + sign * off_z
+                x = BASE_X + off_x
+                y = BASE_Y[leg] + off_y
+                z = BASE_Z + off_z
 
                 send_leg_xyz(leg, x, y, z)
 

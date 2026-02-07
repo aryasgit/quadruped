@@ -16,7 +16,7 @@ BASE_X = 0.00
 BASE_Y = 0.06       # hip-local, left leg
 BASE_Z = -0.18      # nominal stance height
 
-AMP_Z = 0.02        # 2 cm up/down
+AMP_Z = 0.05        # 2 cm up/down
 FREQ = 0.25         # Hz (slow!)
 
 DT = 0.03           # 33 Hz update

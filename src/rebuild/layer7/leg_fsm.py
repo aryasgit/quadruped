@@ -1,105 +1,100 @@
-# layer7/leg_fsm.py
+"""
+Layer 7 — Leg Finite State Machine (FSM)
+=======================================
+
+Responsibilities:
+- Decide per-leg STANCE / SWING states
+- Enforce gait sequencing
+- No geometry, no IK, no posture, no hardware
+
+States:
+- STANCE : foot must stay on ground
+- SWING  : foot allowed to follow swing trajectory
+
+Output:
+{
+  "FL": LegState,
+  "FR": LegState,
+  "RL": LegState,
+  "RR": LegState,
+}
+"""
 
 from enum import Enum
-from typing import Dict, Optional
+from typing import Dict
 
+
+# -------------------------------------------------
+# Leg states
+# -------------------------------------------------
 
 class LegState(Enum):
     STANCE = 0
-    UNLOAD = 1
-    SWING = 2
-    LOAD = 3
+    SWING = 1
 
 
-LEG_ORDER_WALK = ["FL", "RR", "FR", "RL"]   # crawl / walk-safe diagonal order
+# -------------------------------------------------
+# Gait definition (WALK – SpotMicro canonical)
+# -------------------------------------------------
+# Order in which legs are allowed to swing
 
+WALK_ORDER = ["FL", "RR", "FR", "RL"]
+
+
+# -------------------------------------------------
+# FSM class
+# -------------------------------------------------
 
 class LegFSM:
-    """
-    Layer 7 — Leg Finite State Machine
-
-    Authoritative responsibilities:
-    - Which leg may lift
-    - Enforce single-leg swing (for walk)
-    - Respect Layer 6 balance authority
-    """
-
-    def __init__(self):
-        self.state: Dict[str, LegState] = {
-            "FL": LegState.STANCE,
-            "FR": LegState.STANCE,
-            "RL": LegState.STANCE,
-            "RR": LegState.STANCE,
-        }
-
-        self.active_leg: Optional[str] = None
-        self.sequence = LEG_ORDER_WALK.copy()
-        self.seq_idx = 0
-
-    # --------------------------------------------------
-    # PUBLIC UPDATE
-    # --------------------------------------------------
-    def update(
-        self,
-        allow_leg_lift: bool,
-        foot_contact: Dict[str, bool],
-        swing_done: bool,
-        load_done: bool,
-    ):
+    def __init__(self, swing_time: float = 0.25):
         """
-        allow_leg_lift  : from Layer 6
-        foot_contact    : per-leg contact (True = on ground)
-        swing_done      : signal from Layer 9 later
-        load_done       : signal from Layer 9 later
+        Args:
+            swing_time : seconds per leg swing
         """
+        self.swing_time = swing_time
+        self.legs = WALK_ORDER
+        self.index = 0
+        self.timer = 0.0
 
-        # No leg currently moving → try to start one
-        if self.active_leg is None:
-            if not allow_leg_lift:
-                return
+        # Initialize all legs in STANCE
+        self.state = {leg: LegState.STANCE for leg in self.legs}
 
-            next_leg = self._next_leg()
-            if foot_contact.get(next_leg, True):
-                self._enter_unload(next_leg)
-            return
+        # First leg starts swinging
+        self.state[self.legs[self.index]] = LegState.SWING
 
-        # One leg is active → advance its state
-        leg = self.active_leg
-        st = self.state[leg]
+    # -------------------------------------------------
 
-        if st == LegState.UNLOAD:
-            # Minimal rule: once contact breaks, go SWING
-            if not foot_contact.get(leg, True):
-                self.state[leg] = LegState.SWING
+    def reset(self):
+        """Reset FSM to initial state."""
+        self.index = 0
+        self.timer = 0.0
+        self.state = {leg: LegState.STANCE for leg in self.legs}
+        self.state[self.legs[0]] = LegState.SWING
 
-        elif st == LegState.SWING:
-            if swing_done:
-                self.state[leg] = LegState.LOAD
+    # -------------------------------------------------
 
-        elif st == LegState.LOAD:
-            if load_done:
-                self.state[leg] = LegState.STANCE
-                self.active_leg = None
-                self._advance_sequence()
+    def update(self, dt: float) -> Dict[str, LegState]:
+        """
+        Advance FSM by dt seconds.
 
-    # --------------------------------------------------
-    # QUERY HELPERS (used by higher layers)
-    # --------------------------------------------------
-    def is_swing_leg(self, leg: str) -> bool:
-        return self.state[leg] == LegState.SWING
+        Args:
+            dt : timestep (seconds)
 
-    def stance_legs(self):
-        return [l for l, s in self.state.items() if s == LegState.STANCE]
+        Returns:
+            dict mapping leg -> LegState
+        """
+        self.timer += dt
 
-    # --------------------------------------------------
-    # INTERNALS
-    # --------------------------------------------------
-    def _enter_unload(self, leg: str):
-        self.active_leg = leg
-        self.state[leg] = LegState.UNLOAD
+        if self.timer >= self.swing_time:
+            # End current swing
+            current_leg = self.legs[self.index]
+            self.state[current_leg] = LegState.STANCE
 
-    def _next_leg(self) -> str:
-        return self.sequence[self.seq_idx]
+            # Advance to next leg
+            self.index = (self.index + 1) % len(self.legs)
+            next_leg = self.legs[self.index]
+            self.state[next_leg] = LegState.SWING
 
-    def _advance_sequence(self):
-        self.seq_idx = (self.seq_idx + 1) % len(self.sequence)
+            self.timer = 0.0
+
+        return self.state.copy()

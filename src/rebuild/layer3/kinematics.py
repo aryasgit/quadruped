@@ -1,4 +1,4 @@
-
+#kinematics.py
 import numpy as np
 from numpy.linalg import inv, norm
 from numpy import array, asarray, matrix
@@ -95,6 +95,8 @@ class kinematics():
         x_, y_, z_ = j4_2_vec_[0], j4_2_vec_[1], j4_2_vec_[2]
         
         len_B = norm([x_, z_]) # norm(j4-j2)
+        len_B = max(len_B, 1e-6)
+
         
         # handling mathematically invalid input, i.e., point too far away to reach
         if len_B >= (self.link_2 + self.link_3): 
