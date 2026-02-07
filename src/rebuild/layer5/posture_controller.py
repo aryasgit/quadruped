@@ -1,205 +1,152 @@
-#layer5/posture_controller.py
-import time
+"""
+Layer 5 — Roll + Pitch Posture Controller (REFERENCE-STABLE)
+============================================================
 
-from hardware.imu import (
-    init_mpu,
-    calibrate,
-    IMUFilter,
-)
+Key properties:
+- Uses IMU RELATIVE angles (boot = zero)
+- NO slow drift / nose dive
+- Cartesian Z-only leg motion
+- Roll adds coxa stabilization
+- Right wrist mirror FIXED locally
+- Outputs JOINT DELTAS (degrees)
+"""
 
-init_mpu()
-calib = calibrate()
-imu = IMUFilter(calib)
+import math
+from typing import Dict, Tuple
 
-
-
+from hardware.imu import IMUFilter
 from layer3.leg_ik import solve_all_legs
-from layer2.joint_conventions import apply_joint_conventions
-from layer2.joint_space import normalize_all
-from hardware.pca9685 import set_servo_angle
-from hardware.absolute_truths import WRISTS, THIGHS, COXA, BUS
-
-# =====================
-# PITCH PID CONTROLLER
-# =====================
-PITCH_KP = 0.6
-PITCH_KI = 0.8
-PITCH_KD = 0.03
-
-_pitch_i = 0.0
-_prev_pitch = 0.0
-_pitch_filt = 0.0
 
 
-PITCH_I_LIMIT = 12.0    # degrees-equivalent
-PITCH_CMD_LIMIT = 20.0 # max virtual pitch command
+# -------------------------------------------------
+# Geometry (meters)
+# -------------------------------------------------
 
-# =====================
-# ROLL PD CONTROLLER (NO INTEGRAL)
-# =====================
-ROLL_KP = 0.6
-ROLL_KD = 0.03
+BODY_LENGTH = 0.208
+BODY_WIDTH  = 0.078
 
-_prev_roll = 0.0
-ROLL_CMD_LIMIT = 20.0
-
-
-
-# =====================
-# GROUND PITCH ESTIMATOR
-# =====================
-pitch_ref = 0.0
-
-PITCH_REF_ADAPT_RATE = 0.02   # deg/sec
-PITCH_REF_MAX = 20.0          # safety
-
-# =====================
-# LAYER 6 INPUTS (AUTHORITATIVE)
-# =====================
-POSTURE_ENABLED = True
-ALLOW_PITCH_REF_ADAPT = True
-
-SERVO_CHANNELS = {
-    "FL_COXA": COXA["FL"], "FL_THIGH": THIGHS["TFL"], "FL_WRIST": WRISTS["WFL"],
-    "FR_COXA": COXA["FR"], "FR_THIGH": THIGHS["TFR"], "FR_WRIST": WRISTS["WFR"],
-    "RR_COXA": COXA["RR"], "RR_THIGH": THIGHS["TRR"], "RR_WRIST": WRISTS["WRR"],
-    "RL_COXA": COXA["RL"], "RL_THIGH": THIGHS["TRL"], "RL_WRIST": WRISTS["WRL"],
+LEG_X = {
+    "FL": +BODY_LENGTH / 2,
+    "FR": +BODY_LENGTH / 2,
+    "RL": -BODY_LENGTH / 2,
+    "RR": -BODY_LENGTH / 2,
 }
 
-BASE_Z = -0.18
-ROLL_GAIN  = 0.005   # meters per degree
-PITCH_GAIN = 0.005
-X_FRONT_GAIN = 0.0015
-X_REAR_GAIN  = 0.0005   # stronger
+LEG_Y = {
+    "FL": +BODY_WIDTH / 2,
+    "FR": -BODY_WIDTH / 2,
+    "RL": +BODY_WIDTH / 2,
+    "RR": -BODY_WIDTH / 2,
+}
 
 
-def posture_step(foot_targets):
-    global pitch_ref, _pitch_i, _prev_pitch, _prev_roll
-    if not POSTURE_ENABLED:
-        return
-    roll, pitch_meas, _, _ = imu.update()
-    
-    # ---------------------------
-    # ROLL PD (NO INTEGRAL)
-    # ---------------------------
-    roll_err = -roll        # roll_ref = 0
-    dt = 0.02
+# -------------------------------------------------
+# Gains (tuned for REAL robot)
+# -------------------------------------------------
 
-    roll_d = (roll_err - _prev_roll) / dt
-    _prev_roll = roll_err
-
-    roll_cmd = (
-        ROLL_KP * roll_err +
-        ROLL_KD * roll_d
-    )
-
-    roll_cmd = max(min(roll_cmd, ROLL_CMD_LIMIT), -ROLL_CMD_LIMIT)
-
-    global _pitch_filt
-    alpha = 0.85   # strong smoothing, still responsive
-    _pitch_filt = alpha * _pitch_filt + (1 - alpha) * pitch_meas
-    pitch_meas = _pitch_filt
-
-    # ---------------------------
-    # Ground pitch adaptation
-    # ---------------------------
-    pitch_error_raw = pitch_meas - pitch_ref
-
-    if ALLOW_PITCH_REF_ADAPT:
-        pitch_ref += PITCH_REF_ADAPT_RATE * pitch_error_raw * 0.02
-        pitch_ref = max(min(pitch_ref, PITCH_REF_MAX), -PITCH_REF_MAX)
+PITCH_GAIN = 2.0     # stronger than before
+ROLL_GAIN  = 2.5
+COXA_ROLL_GAIN = 18.0  # degrees per rad
 
 
-    # Final control error
-    pitch_err = pitch_meas - pitch_ref
+# -------------------------------------------------
+# Limits / deadbands
+# -------------------------------------------------
 
-    dt = 0.02
+MAX_PITCH_DEG = 20.0
+MAX_ROLL_DEG  = 20.0
 
-    # Integrator
-    if abs(pitch_err) > 0.8:   # degrees
-        _pitch_i += 0.7*pitch_err * dt
-        _pitch_i = max(min(_pitch_i, PITCH_I_LIMIT), -PITCH_I_LIMIT)
-
-
-    # Derivative
-    pitch_d = (pitch_err - _prev_pitch) / dt
-    pitch_d = max(min(pitch_d, 40.0), -40.0)
-    _prev_pitch = pitch_err
-
-    # PID output
-    pitch_cmd = (
-        PITCH_KP * pitch_err +
-        PITCH_KI * _pitch_i +
-        PITCH_KD * pitch_d
-    )
+DEADBAND_DEG = 0.4    # kills slow drift
 
 
-    pitch_cmd = max(min(pitch_cmd, PITCH_CMD_LIMIT), -PITCH_CMD_LIMIT)
-    kp = 2.0 * pitch_cmd * min(1.0, abs(pitch_cmd) / 5.0)
-    kr = 1.5 * roll_cmd  * min(1.0, abs(roll_cmd)  / 5.0)
+# -------------------------------------------------
+# Internal state (REFERENCE LOCK)
+# -------------------------------------------------
 
-    DX_REAR_POLY = 0.0025 * pitch_cmd   # meters per degree
+_ref_roll  = None
+_ref_pitch = None
 
-    dz_left  = -ROLL_GAIN * roll
-    dz_right =  ROLL_GAIN * roll
 
-    
+# -------------------------------------------------
+# Internal: right wrist mirror fix
+# -------------------------------------------------
+
+RIGHT_LEGS = ("FR", "RR")
+
+def _fix_right_wrist_mirroring(deltas: dict) -> dict:
+    out = deltas.copy()
+    for leg in RIGHT_LEGS:
+        k = f"{leg}_WRIST"
+        if k in out:
+            out[k] = -out[k]
+    return out
+
+
+# -------------------------------------------------
+# Core posture controller
+# -------------------------------------------------
+
+def posture_step(
+    nominal_foot_targets: Dict[str, Tuple[float, float, float]],
+    imu: IMUFilter,
+) -> dict:
+    """
+    Returns:
+        joint deltas (degrees)
+    """
+
+    global _ref_roll, _ref_pitch
+
+    # ---------------- IMU ----------------
+    roll, pitch, _, _ = imu.update()
+
+    # Lock reference on first call
+    if _ref_roll is None:
+        _ref_roll  = roll
+        _ref_pitch = pitch
+        return solve_all_legs(nominal_foot_targets)
+
+    # Relative angles
+    roll  = roll  - _ref_roll
+    pitch = pitch - _ref_pitch
+
+    # IMU sign conventions (your robot)
+    # left roll positive, front pitch negative
+    pitch = -pitch
+
+    # Deadband (kills drift)
+    if abs(roll)  < DEADBAND_DEG: roll  = 0.0
+    if abs(pitch) < DEADBAND_DEG: pitch = 0.0
+
+    # Clamp
+    roll  = max(min(roll,  MAX_ROLL_DEG),  -MAX_ROLL_DEG)
+    pitch = max(min(pitch, MAX_PITCH_DEG), -MAX_PITCH_DEG)
+
+    roll_r  = math.radians(roll)
+    pitch_r = math.radians(pitch)
+
+    # ---------------- Cartesian compensation ----------------
+    foot_targets = {}
+
+    for leg, (x, y, z) in nominal_foot_targets.items():
+        lx = LEG_X[leg]
+        ly = LEG_Y[leg]
+
+        dz_pitch = -PITCH_GAIN * lx * math.sin(pitch_r)
+        dz_roll  = -ROLL_GAIN  * ly * math.sin(roll_r)
+
+        foot_targets[leg] = (x, y, z + dz_pitch + dz_roll)
+
+    # ---------------- IK ----------------
     deltas = solve_all_legs(foot_targets)
-    deltas = apply_joint_conventions(deltas)
 
-    # ================================
-    # POSTURE — APPLY ONLY TO STANCE LEGS
-    # ================================
+    # ---------------- Coxa roll stabilization ----------------
+    for leg in ("FL", "RL"):
+        deltas[f"{leg}_COXA"] +=  COXA_ROLL_GAIN * roll_r
+    for leg in ("FR", "RR"):
+        deltas[f"{leg}_COXA"] -=  COXA_ROLL_GAIN * roll_r
 
-    STANCE_LEGS = set(foot_targets.keys())
+    # ---------------- Wrist mirror fix ----------------
+    deltas = _fix_right_wrist_mirroring(deltas)
 
-    # Detect swing leg (the one whose Z is changing)
-    swing_leg = None
-    for leg, (_, _, z) in foot_targets.items():
-        if z > BASE_Z + 1e-4:
-            swing_leg = leg
-            break
-
-    for leg in ("FL", "FR", "RL", "RR"):
-        if leg == swing_leg:
-            continue  # ❌ DO NOT TOUCH SWING LEG
-
-        t = f"{leg}_THIGH"
-        w = f"{leg}_WRIST"
-
-        # Pitch posture
-        deltas[t] += 0.6 * kp
-        deltas[w] -= 1.4 * kp
-
-        # Roll posture
-        deltas[t] += 1.2 * kr
-        deltas[w] -= 1.6 * kr
-
-    DELTA_LIMITS = {
-        "COXA": 20.0,
-        "THIGH": 50.0,
-        "WRIST": 60.0,
-    }
-
-    for j in deltas:
-        if "COXA" in j:
-            deltas[j] = max(min(deltas[j], DELTA_LIMITS["COXA"]),
-                            -DELTA_LIMITS["COXA"])
-        elif "THIGH" in j:
-            deltas[j] = max(min(deltas[j], DELTA_LIMITS["THIGH"]),
-                            -DELTA_LIMITS["THIGH"])
-        elif "WRIST" in j:
-            deltas[j] = max(min(deltas[j], DELTA_LIMITS["WRIST"]),
-                            -DELTA_LIMITS["WRIST"])
-
-    physical = normalize_all(deltas)
-
-    # -------------------------------
-    # COXA LOCK (STANCE)
-    # -------------------------------
-    COXA_STAND = 45.0
-    for k in ("FL_COXA", "FR_COXA", "RL_COXA", "RR_COXA"):
-        physical[k] = COXA_STAND
-        
-
-    return physical
+    return deltas
