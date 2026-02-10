@@ -86,8 +86,8 @@ WRIST_STAND = {
 THIGH_STAND = {
     "TFR": 100,
     "TFL": 170,
-    "TRR": 100,
-    "TRL": 170,
+    "TRR": 93,
+    "TRL": 177,
 }
 
 COXA_STAND = {
