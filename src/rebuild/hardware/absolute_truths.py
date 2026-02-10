@@ -1,4 +1,4 @@
-# absolute_truths.py
+# hardware/absolute_truths.py
 # ==================================================
 # Mechanical & electrical truths (read-only constants)
 # - Servo channel mapping, mechanical limits, stand angles

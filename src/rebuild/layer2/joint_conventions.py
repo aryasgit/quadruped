@@ -1,3 +1,5 @@
+#layer2/joint_conventions.py
+
 """
 Layer 2.5 — JOINT CONVENTION MAPPING
 ===================================

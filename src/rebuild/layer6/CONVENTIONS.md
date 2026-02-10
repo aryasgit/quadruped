@@ -1,4 +1,5 @@
 """
+# layer6/CONVENTION.md
 ============================================================
 CRITICAL STACK CONVENTIONS — READ BEFORE MODIFYING ANY CODE
 ============================================================

@@ -1,3 +1,4 @@
+# hardware/imu.py
 """
 Layer 1.3 — IMU DRIVER (MPU6050)
 ===============================

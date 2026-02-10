@@ -1,3 +1,4 @@
+# hardware/i2c_bus.py
 """
 Layer 1.1 — I2C BUS OWNER
 =========================
