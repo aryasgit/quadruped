@@ -1,4 +1,4 @@
-# quick_test.py (temporary)
+#layer2/test.py
 from hardware.pca9685 import set_servo_angle
 from hardware.absolute_truths import WRISTS, THIGHS, COXA
 

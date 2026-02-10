@@ -1,4 +1,4 @@
-#kinematics.py
+#layer3/kinematics.py
 import numpy as np
 from numpy.linalg import inv, norm
 from numpy import array, asarray, matrix

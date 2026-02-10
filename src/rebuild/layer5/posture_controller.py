@@ -1,3 +1,4 @@
+# layer5/posture_controller.py
 """
 Layer 5 — Roll + Pitch Posture Controller (REFERENCE-STABLE)
 ============================================================

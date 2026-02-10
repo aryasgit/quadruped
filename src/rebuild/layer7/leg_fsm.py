@@ -1,3 +1,4 @@
+# layer7/leg_fsm.py
 """
 Layer 7 — Leg Finite State Machine (FSM)
 =======================================

@@ -1,3 +1,4 @@
+# layer8/gait_phase.py
 """
 Layer 8 — Gait Phase Supervisor
 ===============================
