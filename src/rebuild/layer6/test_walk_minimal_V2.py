@@ -35,7 +35,7 @@ from hardware.absolute_truths import COXA, THIGHS, WRISTS
 # IMPROVED CONFIG (MORE STABLE)
 # -------------------------------------------------
 
-FREQ = 1.7
+FREQ = 1.5
 DT = 0.02
 
 STEP_LENGTH = 0.06    # reduced
