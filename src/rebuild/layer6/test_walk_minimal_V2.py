@@ -32,18 +32,18 @@ from hardware.absolute_truths import COXA, THIGHS, WRISTS
 
 
 # -------------------------------------------------
-# CONFIG
+# IMPROVED CONFIG (MORE STABLE)
 # -------------------------------------------------
 
-FREQ = 0.40            # gait speed (higher = faster)
-DT = 0.03
+FREQ = 1.7
+DT = 0.02
 
-STEP_LENGTH = 0.12    # SAFE for your geometry
+STEP_LENGTH = 0.06    # reduced
 STEP_HEIGHT = 0.030
-DUTY = 0.70           # longer stance = stability
+DUTY = 0.87
 
 STANCE_X = 0.0
-STANCE_Y = 0.065
+STANCE_Y = 0.080
 STANCE_Z = -0.17
 
 # -------------------------------------------------
@@ -51,10 +51,10 @@ STANCE_Z = -0.17
 # -------------------------------------------------
 
 COXA_BIAS = {
-    "FL": -3.0,   # toe in
-    "FR": +3.0,   # toe in
-    "RL": -3.0,   # toe out
-    "RR": +3.0,   # toe out
+    "FL": -1.5,
+    "FR": +1.5,
+    "RL": -1.5,
+    "RR": +1.5,
 }
 
 # -------------------------------------------------
@@ -99,50 +99,42 @@ t0 = time.time()
 try:
     while True:
         t = time.time() - t0
-        cycle = (t * FREQ) % 1.0
-
-        # Which diagonal is active?
-        if cycle < 0.5:
-            active = DIAG_A
-            local_phase = cycle * 2.0     # 0 → 1
-        else:
-            active = DIAG_B
-            local_phase = (cycle - 0.5) * 2.0
-
-        dx, dz = _leg_trajectory(
-            local_phase,
-            STEP_LENGTH,
-            STEP_HEIGHT,
-            DUTY,
-        )
+        phase = (t * FREQ) % 1.0
 
         feet = {}
 
         for leg in ("FL", "FR", "RL", "RR"):
+
+            # Diagonal phase shift
+            if leg in DIAG_A:
+                leg_phase = phase
+            else:
+                leg_phase = (phase + 0.5) % 1.0
+
+            dx, dz = _leg_trajectory(
+                leg_phase,
+                STEP_LENGTH,
+                STEP_HEIGHT,
+                DUTY,
+            )
+
             y = STANCE_Y if leg in ("FL", "RL") else -STANCE_Y
 
-            if leg in active:
-                # swing diagonal
-                feet[leg] = (
-                    STANCE_X + dx,
-                    y,
-                    STANCE_Z + dz,
-                )
-            else:
-                # stance diagonal (PLANTED)
-                feet[leg] = (
-                    STANCE_X,
-                    y,
-                    STANCE_Z,
-                )
+            # CRITICAL FIX:
+            # stance legs move backward relative to body
+            feet[leg] = (
+                STANCE_X + dx,
+                y,
+                STANCE_Z + dz,
+            )
 
         deltas = solve_all_legs(feet)
         deltas = apply_joint_conventions(deltas)
         physical = normalize_all(deltas)
-        # Apply static COXA bias ONCE
+
+        # Light coxa preload
         for leg, bias in COXA_BIAS.items():
             physical[f"{leg}_COXA"] += bias
-
 
         for joint, ch in CHANNELS.items():
             set_servo_angle(ch, physical[joint])
