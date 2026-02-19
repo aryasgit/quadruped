@@ -78,17 +78,11 @@ ROLL_GAIN      = 0.6      # Z compensation per roll  degree
 COXA_ROLL_GAIN = 2.0      # coxa degrees per radian roll
 
 # Yaw trim via DIFFERENTIAL STRIDE LENGTH (meters).
-# Right legs stride longer than left → clockwise yaw from ground friction.
-# Auto-calculated from coxa stand-angle asymmetry in absolute_truths.py.
-# This value is ADDED to right-leg step_length and SUBTRACTED from left.
-_YAW_K = 0.0946  # empirical gain: trim per radian of coxa asymmetry
-_rear_asym  = COXA_MECH["RL"]["perp"] - COXA_MECH["RR"]["perp"]
-_front_asym = COXA_MECH["FL"]["perp"] - COXA_MECH["FR"]["perp"]
-_total_asym = _rear_asym + _front_asym
-YAW_STRIDE_TRIM = _YAW_K * math.sin(math.radians(abs(_total_asym)))
-if _total_asym < 0:
-    YAW_STRIDE_TRIM = -YAW_STRIDE_TRIM
-YAW_STRIDE_TRIM = max(-0.020, min(0.020, YAW_STRIDE_TRIM))
+# Positive → right legs stride longer → counter-clockwise correction.
+# Negative → left  legs stride longer → clockwise correction.
+# Manual override — auto-calc from coxa asymmetry was unreliable after recal.
+# Tune: if robot rotates RIGHT, increase; if LEFT, decrease.
+YAW_STRIDE_TRIM = 0.005   # metres  (start conservative, tune with --log)
 
 # EMA smoothing factor for IMU angles (0 = no smoothing, 1 = no filter)
 # At 33Hz with alpha=0.3: tau≈0.07s, cutoff≈2.3Hz — smoother output,
