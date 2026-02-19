@@ -55,46 +55,46 @@ COXA = {
 # --- Mechanical angle limits and perpendicular (measured) --- 
 # (these dictionaries express the mechanical mapping of servo-angle domain)
 WRIST_MECH = {
-    "WFL": {"min": 0,   "max": 200, "perp": 155},
-    "WRL": {"min": 0,   "max": 200, "perp": 151},
-    "WFR": {"min": 200, "max": 0,   "perp": 48},
-    "WRR": {"min": 200, "max": 0,   "perp": 50},
+    "WFL": {"min": 0,   "max": 200, "perp": 153},
+    "WRL": {"min": 0,   "max": 200, "perp": 153},
+    "WFR": {"min": 200, "max": 0,   "perp": 47},
+    "WRR": {"min": 200, "max": 0,   "perp": 47},
 }
 
 THIGH_MECH = {
-    "TFL": {"min": 0,   "max": 270, "perp": 126},
-    "TRL": {"min": 0,   "max": 270, "perp": 134},
-    "TFR": {"min": 270, "max": 0,   "perp": 139},
-    "TRR": {"min": 270, "max": 0,   "perp": 141},
+    "TFL": {"min": 0,   "max": 270, "perp": 128},
+    "TRL": {"min": 0,   "max": 270, "perp": 135},
+    "TFR": {"min": 270, "max": 0,   "perp": 138},
+    "TRR": {"min": 270, "max": 0,   "perp": 140},
 }
 
 COXA_MECH = {
-    "FL": {"min": 0,  "max": 90, "perp": 43},
-    "RL": {"min": 0,  "max": 90, "perp": 54},
-    "FR": {"min": 90, "max": 0,  "perp": 46},
-    "RR": {"min": 90, "max": 0,  "perp": 46},
+    "FL": {"min": 0,  "max": 90, "perp": 39},
+    "RL": {"min": 0,  "max": 90, "perp": 50},
+    "FR": {"min": 90, "max": 0,  "perp": 47},
+    "RR": {"min": 90, "max": 0,  "perp": 44},
 }
 
 # --- Stand pose (measured absolute angles) ---
 WRIST_STAND = {
-    "WFR": 123,
-    "WFL": 80,
-    "WRR": 125,
-    "WRL": 76,
+    "WFR": 122,
+    "WFL": 78,
+    "WRR": 122,
+    "WRL": 78,
 }
 
 THIGH_STAND = {
-    "TFR": 99,
-    "TFL": 166,
-    "TRR": 101,
-    "TRL": 174,
+    "TFR":  98,
+    "TFL": 168,
+    "TRR": 100,
+    "TRL": 175,
 }
 
 COXA_STAND = {
-    "FR": 46,
-    "FL": 43,
-    "RR": 46,
-    "RL": 54,
+    "FR": 47,
+    "FL": 39,
+    "RR": 44,
+    "RL": 50,
 }
 
 # That's it — pure facts only.
