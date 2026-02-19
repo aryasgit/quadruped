@@ -29,7 +29,7 @@ import argparse
 from typing import Dict, Tuple
 
 # ── proven pipeline ─────────────────────────────
-from layer3.leg_ik import solve_all_legs, _STAND_Y
+from layer3.leg_ik import solve_all_legs, _STAND_Y, _STAND_Z
 from layer2.joint_conventions import apply_joint_conventions
 from layer2.joint_space import normalize_all
 
@@ -51,8 +51,9 @@ SERVO_MAP = {
 # ================================================================
 #  GEOMETRY CONSTANTS
 # ================================================================
-STANCE_Y = 0.080       # lateral foot offset (m)
-STANCE_Z = -0.170      # standing height (m)
+# Use the SAME stand reference as the IK solver to ensure deltas are zero at neutral
+STANCE_Y = _STAND_Y    # lateral foot offset (m) — from leg_ik.py
+STANCE_Z = _STAND_Z    # standing height (m) — from leg_ik.py
 DT = 0.025             # 40 Hz update rate
 
 
@@ -123,28 +124,43 @@ def shake():
     print("🤝 Shake!")
     neutral = _neutral_feet()
 
-    # step 1: move FR paw forward (along body)
-    forward = dict(neutral)
-    forward["FR"] = (0.06, -STANCE_Y, STANCE_Z)
-    _transition(neutral, forward, duration=0.4)
+    # step 1: SHIFT WEIGHT LEFT before lifting right paw
+    #         - Move FL outward (wider stance on support side)
+    #         - Move body slightly left by shifting FR inward
+    #         - Rear legs shift left to move CoM over left tripod
+    weight_left = dict(neutral)
+    weight_left["FL"] = (0.02,  STANCE_Y + 0.015, STANCE_Z - 0.01)  # FL out & down (support)
+    weight_left["FR"] = (0.0,  -STANCE_Y + 0.02, STANCE_Z)          # FR inward (prep to lift)
+    weight_left["RL"] = (0.0,   STANCE_Y + 0.01, STANCE_Z)          # RL slightly out
+    weight_left["RR"] = (0.0,  -STANCE_Y + 0.01, STANCE_Z)          # RR slightly in
+    _transition(neutral, weight_left, duration=0.5)
+    time.sleep(0.2)
 
-    # step 2: lift paw up from forward position
-    offer = dict(forward)
-    offer["FR"] = (0.06, -STANCE_Y + 0.01, STANCE_Z + 0.06)
-    _transition(forward, offer, duration=0.5)
+    # step 2: lift FR paw up and forward
+    offer = dict(weight_left)
+    offer["FR"] = (0.05, -STANCE_Y + 0.02, STANCE_Z + 0.07)  # lift up & forward
+    _transition(weight_left, offer, duration=0.5)
 
     # hold for handshake
     print("   (waiting for handshake...)")
     time.sleep(2.0)
 
-    # small up-down shake motion
-    for _ in range(2):
+    # up-down shake motion — larger amplitude for visibility
+    for _ in range(3):
         up = dict(offer)
-        up["FR"] = (0.06, -STANCE_Y + 0.01, STANCE_Z + 0.075)
-        _transition(offer, up, duration=0.2)
-        _transition(up, offer, duration=0.2)
+        up["FR"] = (0.07, -STANCE_Y + 0.01, STANCE_Z + 0.10)  # higher & more forward
+        _transition(offer, up, duration=0.15)
+        down = dict(offer)
+        down["FR"] = (0.03, -STANCE_Y + 0.03, STANCE_Z + 0.05)  # lower & back
+        _transition(up, down, duration=0.15)
+        _transition(down, offer, duration=0.15)
 
-    _transition(offer, neutral, duration=0.8)
+    # step 3: lower paw back to weight-shifted position first
+    _transition(offer, weight_left, duration=0.5)
+    time.sleep(0.1)
+
+    # step 4: return to neutral
+    _transition(weight_left, neutral, duration=0.5)
 
 
 # ================================================================
@@ -234,14 +250,14 @@ def bheek():
     print("👀 Look around!")
     neutral = _neutral_feet()
 
-    # look left — shift both front feet right (body turns left)
+    # look left — shift both front feet back MORE AGGRESSIVELY to tip backward
     look_l = dict(neutral)
-    look_l["FL"] = (-0.06,  STANCE_Y, STANCE_Z)
-    look_l["FR"] = (-0.06, -STANCE_Y, STANCE_Z)
-    look_l["RL"] = (0.03,  STANCE_Y, STANCE_Z)
-    look_l["RR"] = (0.03, -STANCE_Y, STANCE_Z)
+    look_l["FL"] = (-0.085,  STANCE_Y, STANCE_Z)   # was -0.06, now -0.085
+    look_l["FR"] = (-0.085, -STANCE_Y, STANCE_Z)   # was -0.06, now -0.085
+    look_l["RL"] = (0.04,  STANCE_Y, STANCE_Z)     # was 0.03, now 0.04
+    look_l["RR"] = (0.04, -STANCE_Y, STANCE_Z)     # was 0.03, now 0.04
 
-    _transition(neutral, look_l, duration=0.6)
+    _transition(neutral, look_l, duration=0.4)    # was 0.6, now 0.4 (faster for momentum)
     time.sleep(1.5)  # wait for robot to settle on rear legs
 
     # ── Front paws pump up and down together while in the air ──
@@ -298,6 +314,72 @@ def bheek():
     time.sleep(0.3)
 
     # Step 3: smoothly rise to full stance
+    _transition(half, neutral, duration=0.6)
+
+
+# ================================================================
+#  TRICK 6b: HIGH FIVE (rear up + handshake)
+# ================================================================
+def high_five():
+    """Rear up on hind legs and offer right paw for a high-five."""
+    print("✋ High Five!")
+    neutral = _neutral_feet()
+
+    # step 1: tip backward onto hind legs (same as bheek)
+    reared = dict(neutral)
+    reared["FL"] = (-0.085,  STANCE_Y, STANCE_Z)
+    reared["FR"] = (-0.085, -STANCE_Y, STANCE_Z)
+    reared["RL"] = (0.04,  STANCE_Y, STANCE_Z)
+    reared["RR"] = (0.04, -STANCE_Y, STANCE_Z)
+
+    _transition(neutral, reared, duration=0.4)
+    time.sleep(1.0)  # settle on rear legs
+
+    # step 2: extend FR paw forward slowly for high-five
+    #         keep FL tucked for balance
+    offer = dict(reared)
+    offer["FL"] = (-0.04,  STANCE_Y, STANCE_Z - 0.02)  # FL tucked closer to body
+    offer["FR"] = (0.06, -STANCE_Y - 0.02, STANCE_Z + 0.03)  # FR extended out
+
+    _transition(reared, offer, duration=0.8)  # slow extension
+
+    # hold for high-five
+    print("   (waiting for high-five...)")
+    time.sleep(2.5)
+
+    # step 3: wave motion — larger amplitude for visibility
+    for _ in range(3):
+        wave_up = dict(offer)
+        wave_up["FR"] = (0.09, -STANCE_Y - 0.03, STANCE_Z + 0.07)  # extend out & up
+        _transition(offer, wave_up, duration=0.18)
+        wave_down = dict(offer)
+        wave_down["FR"] = (0.03, -STANCE_Y - 0.01, STANCE_Z)  # pull back & down
+        _transition(wave_up, wave_down, duration=0.18)
+        _transition(wave_down, offer, duration=0.18)
+
+    # step 4: retract paw back to reared position
+    _transition(offer, reared, duration=0.5)
+    time.sleep(0.3)
+
+    # step 5: recovery pounce (same as bheek)
+    crouch = {
+        "FL": (0.0,  STANCE_Y, STANCE_Z + 0.05),
+        "FR": (0.0, -STANCE_Y, STANCE_Z + 0.05),
+        "RL": (0.0,  STANCE_Y, STANCE_Z + 0.05),
+        "RR": (0.0, -STANCE_Y, STANCE_Z + 0.05),
+    }
+    _send(crouch)
+    time.sleep(0.6)
+
+    half = {
+        "FL": (0.0,  STANCE_Y, STANCE_Z + 0.025),
+        "FR": (0.0, -STANCE_Y, STANCE_Z + 0.025),
+        "RL": (0.0,  STANCE_Y, STANCE_Z + 0.025),
+        "RR": (0.0, -STANCE_Y, STANCE_Z + 0.025),
+    }
+    _transition(crouch, half, duration=0.5)
+    time.sleep(0.3)
+
     _transition(half, neutral, duration=0.6)
 
 
@@ -430,6 +512,7 @@ TRICKS = {
     "wiggle":      (wiggle,      "Excited butt wiggle"),
     "pushups":     (pushups,     "Squat up and down"),
     "bheek":      (bheek,       "Stand on rear legs and pan"),
+    "high_five":   (high_five,   "Rear up and offer paw for high-five"),
     "sit":         (sit,         "Sit like a dog"),
     "stretch":     (stretch,     "Morning stretch"),
     "tilt_dance":  (tilt_dance,  "Roll side to side"),

@@ -5,6 +5,12 @@ Parth/TricksGUI.py — DARK CYBER GUI FOR SPOTMICRO TRICKS
 A tkinter GUI matching the pose_v3.py dark aesthetic.
 Runs tricks from Tricks2.py in background threads so the GUI stays responsive.
 
+Features:
+- Emergency Stop button (Esc key)
+- Keyboard shortcuts (1-9 for tricks, Space for stand)
+- Execution history log
+- Live status indicator
+
 Run:
     cd src/rebuild
     python -m Parth.TricksGUI
@@ -14,11 +20,12 @@ import time
 import threading
 import tkinter as tk
 from tkinter import ttk
+from collections import deque
 
 # ── import tricks engine ────────────────────────
 from hardware.pca9685 import init_pca
 from Parth.Tricks2 import (
-    stand, shake, bow, wiggle, pushups, bheek,
+    stand, shake, bow, wiggle, pushups, bheek, high_five,
     sit, stretch, tilt_dance, combo, TRICKS,
 )
 
@@ -55,47 +62,103 @@ FONT_SM   = ("Consolas", 9)
 trick_running = False        # True while a trick thread is active
 current_trick = ""           # name of trick in progress
 trick_start_time = 0.0
+stop_requested = False       # Emergency stop flag
+history = deque(maxlen=10)   # Last 10 trick executions: (name, duration, success)
+
+
+# ================================================================
+#  EMERGENCY STOP
+# ================================================================
+def emergency_stop(status_var, btn_map):
+    """Immediately stop and return to stand."""
+    global stop_requested, trick_running, current_trick
+    stop_requested = True
+    status_var.set("🛑  E-STOP — returning to stand...")
+    
+    # Force stand position
+    try:
+        stand()
+    except:
+        pass
+    
+    # Reset state
+    trick_running = False
+    current_trick = ""
+    stop_requested = False
+    
+    # Re-enable buttons
+    for b in btn_map.values():
+        b.config(state="normal")
+    
+    status_var.set("🛑  E-STOP complete — robot at stand")
+    history.append(("E-STOP", 0.0, True))
 
 
 # ================================================================
 #  TRICK RUNNER (background thread)
 # ================================================================
-def _run_trick(name: str, func, status_var, btn_map):
+def _run_trick(name: str, func, status_var, btn_map, history_var):
     """Execute a trick in a background thread and update GUI state."""
-    global trick_running, current_trick, trick_start_time
+    global trick_running, current_trick, trick_start_time, stop_requested
 
     trick_running = True
     current_trick = name
     trick_start_time = time.time()
     status_var.set(f"▶  {name.upper()} running ...")
 
-    # disable all buttons
-    for b in btn_map.values():
-        b.config(state="disabled")
+    # disable all buttons except E-STOP
+    for key, b in btn_map.items():
+        if key != "estop":
+            b.config(state="disabled")
 
+    success = True
     try:
         func()
     except Exception as e:
-        status_var.set(f"⚠  {name}: {e}")
+        success = False
+        if not stop_requested:
+            status_var.set(f"⚠  {name}: {e}")
+            # Return to stand on error
+            try:
+                stand()
+            except:
+                pass
     finally:
+        elapsed = time.time() - trick_start_time
         trick_running = False
         current_trick = ""
-        elapsed = time.time() - trick_start_time
-        status_var.set(f"✔  {name} done  ({elapsed:.1f}s)")
+        
+        if success and not stop_requested:
+            status_var.set(f"✔  {name} done  ({elapsed:.1f}s)")
+        
+        # Add to history
+        history.append((name, elapsed, success and not stop_requested))
+        _update_history(history_var)
+        
+        stop_requested = False
 
         # re-enable buttons
         for b in btn_map.values():
             b.config(state="normal")
 
 
-def launch_trick(name, func, status_var, btn_map):
+def _update_history(history_var):
+    """Update history display."""
+    lines = []
+    for name, dur, ok in reversed(history):
+        icon = "✓" if ok else "✗"
+        lines.append(f"{icon} {name} ({dur:.1f}s)")
+    history_var.set("\n".join(lines) if lines else "No tricks yet")
+
+
+def launch_trick(name, func, status_var, btn_map, history_var):
     """Kick off a trick if none is running."""
     if trick_running:
         status_var.set("⏳  Wait — trick in progress")
         return
     t = threading.Thread(
         target=_run_trick,
-        args=(name, func, status_var, btn_map),
+        args=(name, func, status_var, btn_map, history_var),
         daemon=True,
     )
     t.start()
@@ -107,28 +170,62 @@ def launch_trick(name, func, status_var, btn_map):
 def build_gui():
     root = tk.Tk()
     root.title("SPOTMICRO // TRICKS")
-    root.geometry("520x750")
+    root.geometry("520x850")
     root.configure(bg=CYBER_BG)
     root.resizable(False, True)
 
-    # ────────── Header ──────────
+    # ────────── Button storage ──────────
+    btn_map = {}
+    
+    # ────────── Status var (needed early for E-STOP) ──────────
+    status_var = tk.StringVar(value="Ready — pick a trick  |  Esc=E-STOP  Space=Stand")
+    history_var = tk.StringVar(value="No tricks yet")
+
+    # ────────── Header with E-STOP ──────────
     header = tk.Frame(root, bg=CYBER_HEADER)
     header.pack(fill="x")
 
+    header_top = tk.Frame(header, bg=CYBER_HEADER)
+    header_top.pack(fill="x", padx=14, pady=6)
+
     tk.Label(
-        header,
+        header_top,
         text="SPOTMICRO // TRICKS",
         font=FONT_BIG,
         fg="#ffffff",
         bg=CYBER_HEADER,
-        pady=6,
-    ).pack(anchor="w", padx=14)
+    ).pack(side="left")
+
+    # E-STOP button (always visible in header)
+    estop_btn = tk.Button(
+        header_top,
+        text="🛑 E-STOP",
+        command=lambda: emergency_stop(status_var, btn_map),
+        bg="#8B0000",
+        fg="#ffffff",
+        activebackground="#FF0000",
+        activeforeground="#ffffff",
+        relief="flat",
+        font=FONT_HDR,
+        cursor="hand2",
+        padx=12,
+    )
+    estop_btn.pack(side="right")
+    btn_map["estop"] = estop_btn
 
     tk.Label(
         header,
-        text="shake • bow • wiggle • pushups • bheek • sit • stretch • tilt • combo",
+        text="shake • bow • wiggle • pushups • bheek • high_five • sit • stretch • tilt • combo",
         font=FONT_SM,
         fg=CYBER_MUTED,
+        bg=CYBER_HEADER,
+    ).pack(anchor="w", padx=16, pady=(0, 4))
+    
+    tk.Label(
+        header,
+        text="Keys: 1-9=tricks  0=combo  Space=stand  Esc=E-STOP",
+        font=FONT_SM,
+        fg=CYBER_PINK_DIM,
         bg=CYBER_HEADER,
     ).pack(anchor="w", padx=16, pady=(0, 8))
 
@@ -166,7 +263,6 @@ def build_gui():
     canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(3, "units"))
 
     # ────────── Status bar ──────────
-    status_var = tk.StringVar(value="Ready — pick a trick")
     status_bar = tk.Label(
         root,
         textvariable=status_var,
@@ -177,9 +273,6 @@ def build_gui():
         pady=6,
     )
     status_bar.pack(fill="x", padx=12, side="bottom")
-
-    # ────────── Button storage ──────────
-    btn_map = {}
 
     # ────────── Helper: section label ──────────
     def section(text, parent=body, top_pad=14):
@@ -193,11 +286,12 @@ def build_gui():
 
     # ────────── Helper: trick button ──────────
     def trick_btn(name, func, label, bg_color=CYBER_BTN,
-                  fg_color=CYBER_TEXT, font=FONT_MAIN, parent=body):
+                  fg_color=CYBER_TEXT, font=FONT_MAIN, parent=body, shortcut=""):
+        shortcut_text = f"  [{shortcut}]" if shortcut else ""
         b = tk.Button(
             parent,
-            text=label,
-            command=lambda: launch_trick(name, func, status_var, btn_map),
+            text=label + shortcut_text,
+            command=lambda: launch_trick(name, func, status_var, btn_map, history_var),
             bg=bg_color,
             fg=fg_color,
             activebackground=CYBER_BTN_HI,
@@ -218,7 +312,7 @@ def build_gui():
     trick_btn(
         "stand", stand,
         "🏠  STAND  (neutral)",
-        bg_color="#1a3320", fg_color=CYBER_GREEN, font=FONT_HDR,
+        bg_color="#1a3320", fg_color=CYBER_GREEN, font=FONT_HDR, shortcut="Space",
     )
 
     # ================================================================
@@ -226,14 +320,15 @@ def build_gui():
     # ================================================================
     section("TRICKS")
 
-    trick_btn("shake",      shake,                "🤝  Shake")
-    trick_btn("bow",        bow,                  "🙇  Bow")
-    trick_btn("wiggle",     wiggle,               "🍑  Wiggle")
-    trick_btn("pushups",    pushups,              "💪  Pushups")
-    trick_btn("bheek",      bheek,                "🐕  Bheek  (stand on rear)")
-    trick_btn("sit",        sit,                  "🐕  Sit")
-    trick_btn("stretch",    stretch,              "🐕‍🦺  Stretch")
-    trick_btn("tilt_dance", tilt_dance,           "💃  Tilt Dance")
+    trick_btn("shake",      shake,                "🤝  Shake", shortcut="1")
+    trick_btn("bow",        bow,                  "🙇  Bow", shortcut="2")
+    trick_btn("wiggle",     wiggle,               "🍑  Wiggle", shortcut="3")
+    trick_btn("pushups",    pushups,              "💪  Pushups", shortcut="4")
+    trick_btn("bheek",      bheek,                "🐕  Bheek  (stand on rear)", shortcut="5")
+    trick_btn("high_five",  high_five,            "✋  High Five  (rear + shake)", shortcut="6")
+    trick_btn("sit",        sit,                  "🐕  Sit", shortcut="7")
+    trick_btn("stretch",    stretch,              "🐕‍🦺  Stretch", shortcut="8")
+    trick_btn("tilt_dance", tilt_dance,           "💃  Tilt Dance", shortcut="9")
 
     # ================================================================
     #  COMBO / DEMO
@@ -243,7 +338,7 @@ def build_gui():
     trick_btn(
         "combo", combo,
         "🎬  COMBO  (all tricks)",
-        bg_color=CYBER_PINK, fg_color="#000000", font=FONT_HDR,
+        bg_color=CYBER_PINK, fg_color="#000000", font=FONT_HDR, shortcut="0",
     )
 
     # ================================================================
@@ -295,6 +390,48 @@ def build_gui():
 
     bar_fg = tk.Frame(bar_bg, bg=CYBER_PINK, width=0, height=8)
     bar_fg.pack(side="left")
+
+    # ================================================================
+    #  HISTORY LOG
+    # ================================================================
+    section("HISTORY", top_pad=16)
+
+    history_label = tk.Label(
+        body,
+        textvariable=history_var,
+        font=FONT_SM,
+        fg=CYBER_MUTED,
+        bg=CYBER_PANEL,
+        anchor="w",
+        justify="left",
+    )
+    history_label.pack(fill="x", padx=12, pady=(0, 12))
+
+    # ────────── Keyboard shortcuts ──────────
+    trick_shortcuts = {
+        "1": ("shake", shake),
+        "2": ("bow", bow),
+        "3": ("wiggle", wiggle),
+        "4": ("pushups", pushups),
+        "5": ("bheek", bheek),
+        "6": ("high_five", high_five),
+        "7": ("sit", sit),
+        "8": ("stretch", stretch),
+        "9": ("tilt_dance", tilt_dance),
+        "0": ("combo", combo),
+    }
+
+    def on_key(event):
+        key = event.keysym
+        if key == "Escape":
+            emergency_stop(status_var, btn_map)
+        elif key == "space":
+            launch_trick("stand", stand, status_var, btn_map, history_var)
+        elif key in trick_shortcuts:
+            name, func = trick_shortcuts[key]
+            launch_trick(name, func, status_var, btn_map, history_var)
+
+    root.bind("<Key>", on_key)
 
     # ────────── Periodic update ──────────
     pulse_phase = [0]
