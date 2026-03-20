@@ -396,16 +396,86 @@ def execute_step(feet: dict) -> bool:
 # Keyboard input (Linux)
 # -------------------------------------------------
 
+import pygame
+
+pygame.init()
+pygame.joystick.init()
+
+controller = pygame.joystick.Joystick(0)
+controller.init()
+
+
 def get_key_blocking():
-    """Get single keypress (blocking)."""
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        key = sys.stdin.read(1)
-        return key.lower()
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+    while True:
+
+        pygame.event.pump()
+
+        # ---------------- D-PAD ----------------
+        hat = controller.get_hat(0)
+
+        if hat == (0, 1):
+            return 'w'
+
+        elif hat == (0, -1):
+            return 's'
+
+        elif hat == (-1, 0):
+            return 'q'
+
+        elif hat == (1, 0):
+            return 'e'
+
+        # ---------------- TRIGGERS ----------------
+
+        lt = controller.get_axis(2)
+        rt = controller.get_axis(5)
+
+        if lt > 0.7:
+            return '3'     # Bow
+
+        if rt > 0.7:
+            return '2'     # Stretch
+        # ---------------- BUTTONS ----------------
+
+        # LB
+        if controller.get_button(4):
+            return '1'
+
+        # RB
+        if controller.get_button(5):
+            return '5'
+
+        # B
+        if controller.get_button(1):
+            return '4'
+
+        # A
+        if controller.get_button(0):
+            return '9'
+
+        # Y
+        if controller.get_button(3):
+            return 'c'
+
+        # X
+        if controller.get_button(2):
+            return 'x'
+
+
+        # ---------------- M1 / M2 ----------------
+        # your logs show these mirror A/B events
+
+        # M1
+        if controller.get_button(6):
+            return '7'
+
+        # M2
+        if controller.get_button(7):
+            return '6'
+
+
+        time.sleep(0.01)
 
 
 # -------------------------------------------------
