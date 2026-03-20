@@ -10,12 +10,6 @@ Responsibilities:
 - Own bus lifetime
 - Provide a getter so all drivers share the same bus
 
-NON-RESPONSIBILITIES (forbidden here):
-- No PCA9685 logic
-- No MPU6050 logic
-- No retries, filters, or control policy
-- No robot semantics
-
 If something breaks here, the failure is electrical, not logical.
 """
 
