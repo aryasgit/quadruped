@@ -9,7 +9,7 @@
 # ==================================================
 
 # --- I2C / hardware (Jetson / SMBus) ---
-BUS = 7                # Jetson I2C bus used in your setup (keep as you provided)
+BUS = 7                # Jetson I2C bus used in your setup 
 PCA_ADDR = 0x40        # PCA9685 I2C address (repo uses this address)
 MPU_ADDR = 0x68        # MPU6050 IMU I2C address
 
@@ -25,8 +25,8 @@ CONFIG         = 0x1A
 GYRO_CONFIG    = 0x1B
 ACCEL_CONFIG   = 0x1C
 
-# --- Servo electrical limits (do not change lightly) ---
-# These are pulse steps used by the PCA9685 driver; defined by you
+# --- Servo electrical limits ---
+# These are pulse steps used by the PCA9685 driver; 
 PULSE_MIN = 106
 PULSE_MAX = 535
 
