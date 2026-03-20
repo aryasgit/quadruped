@@ -1,5 +1,8 @@
 # main_controller.py — Top-Level Run Loop
 
+<img width="628" height="537" alt="Screenshot 2026-03-21 at 2 01 40 AM" src="https://github.com/user-attachments/assets/d82a24b4-e011-4329-a96b-c1ef19c95fbb" />
+
+
 > Gamepad input → direction commands → gait execution → servo output. The only file that talks to both the gait layer and the hardware layer.
 
 ---
