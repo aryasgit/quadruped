@@ -43,6 +43,21 @@ This project implements a fully autonomous quadruped robot controller in Python.
 
 ## Hardware
 
+## Hardware
+
+See [`docs/hardware/`](docs/hardware/) for full selection rationale, specs, and integration notes.
+
+### Quick Reference
+
+| Component | Selected | Docs |
+|---|---|---|
+| Depth camera | Orbbec Gemini 336 | [camera/](docs/hardware/camera/) |
+| RGB camera | Arducam IMX219 220° fisheye | [camera/](docs/hardware/camera/) |
+| Battery | GenX Premium 5200 (4S 40C) | [battery/](docs/hardware/battery/) |
+| Compute | NVIDIA Jetson Orin Nano | — |
+| Servo driver | PCA9685 | [hardware/](src/main/hardware/README.md) |
+| IMU | MPU6050 | [hardware/](src/main/hardware/README.md) |
+
 | Component | Part |
 |---|---|
 | Frame | SpotMicro 3D-printed (Thingiverse) |
