@@ -1,6 +1,6 @@
 ## License
 
-© 2025 Aryaman Gupta and Krish Agarwal. All Rights Reserved.
+© 2026 Aryaman Gupta and Krish Agarwal. All Rights Reserved.
 
 This repository is proprietary software.
 No permission is granted to use, copy, modify, or distribute
