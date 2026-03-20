@@ -23,20 +23,20 @@ import termios
 import select
 
 # ---------------- Layer 6 ----------------
-from gait.generator import _leg_trajectory
+from main.gait.generator import _leg_trajectory
 
 # ---------------- Layer 3 ----------------
-from ik.solver import solve_all_legs
+from IK.leg_ik import solve_all_legs
 
 # ---------------- Layer 2 ----------------
-from joints.conventions import apply_joint_conventions
-from joints.space import normalize_all
+from layer2.joint_conventions import apply_joint_conventions
+from layer2.joint_space import normalize_all
 
 # ---------------- Hardware ----------------
 from hardware.pca9685 import set_servo_angle
 from hardware.absolute_truths import COXA, THIGHS, WRISTS
 # ---------------- Tricks ----------------
-from stance.tricks import (
+from main.stance.tricks import (
     stand, shake, bow, wiggle, pushups,
     bheek, high_five, sit, stretch,
     tilt_dance, combo
@@ -135,9 +135,6 @@ HEIGHT_TRANSITION = 0.3  # Time to transition between heights
 # -------------------------------------------------
 
 COXA_DELTA_BIAS = {
-    # Applied in IK delta space, before sign flip in joint_conventions.
-    # After sign × servo_dir both sides resolve to the same geometric direction.
-    # +1.5 produces a geometric toe-in of ~1.5° on all four legs.
     "FL": +1.5,
     "FR": +1.5,
     "RL": +1.5,
@@ -249,34 +246,45 @@ def compute_feet_forward_backward(phase: float, direction: str, stance_z: float 
 def compute_feet_lateral(phase: float, direction: str, stance_z: float = STANCE_Z) -> dict:
     """
     Compute foot targets for left/right strafe.
-
-    For right strafe: all feet push in -Y (body moves +Y).
-    Left legs get -dy, right legs get +dy so each side pushes outward.
-    Left strafe: reverse the phase so the trajectory runs backwards.
+    Uses Y-axis trajectory - the semicircle arc happens in Y direction.
+    
+    Right strafe works correctly.
+    Left strafe = reverse the trajectory by using (1 - leg_phase).
     """
     feet = {}
-
+    
     for leg in ("FL", "FR", "RL", "RR"):
-        leg_phase = phase if leg in DIAG_A else wrap_phase(phase + 0.5)
-
+        # Diagonal phase shift (same pattern as forward walk)
+        if leg in DIAG_A:
+            leg_phase = phase
+        else:
+            leg_phase = wrap_phase(phase + 0.5)
+        
+        # For LEFT: reverse the trajectory timing
         if direction == "left":
             leg_phase = 1.0 - leg_phase
-
+        
+        # Get Y-axis trajectory (lateral movement)
         dy, dz = _lateral_trajectory(
             leg_phase,
             LATERAL_STEP_LENGTH,
             LATERAL_STEP_HEIGHT,
             DUTY,
         )
-
-        # Right legs move opposite Y to left legs so all feet push outward.
-        # Single explicit multiplier — no double flip.
-        y_mult = +1 if leg in ("FR", "RR") else -1
-        dy = dy * y_mult
-
+        
+        # Base logic: RIGHT strafe (which works)
+        dy = dy * (-1)  # Right strafe base multiplier
+        
+        # Right-side legs need inverted Y offset
+        if leg in ("FR", "RR"):
+            dy = -dy
+        
+        # Base Y position for this leg
         base_y = STANCE_Y if leg in ("FL", "RL") else -STANCE_Y
+        
+        # X stays at stance, Y gets trajectory offset, Z gets lift
         feet[leg] = (STANCE_X, base_y + dy, stance_z + dz)
-
+    
     return feet
 
 
@@ -385,79 +393,19 @@ def execute_step(feet: dict) -> bool:
 
 
 # -------------------------------------------------
-# Keyboard / gamepad input
+# Keyboard input (Linux)
 # -------------------------------------------------
 
-def get_key_blocking(controller):
-    import pygame
-    while True:
-        pygame.event.pump()
-
-        # ---------------- D-PAD ----------------
-        hat = controller.get_hat(0)
-
-        if hat == (0, 1):
-            return 'w'
-
-        elif hat == (0, -1):
-            return 's'
-
-        elif hat == (-1, 0):
-            return 'q'
-
-        elif hat == (1, 0):
-            return 'e'
-
-        # ---------------- TRIGGERS ----------------
-
-        lt = controller.get_axis(2)
-        rt = controller.get_axis(5)
-
-        if lt > 0.7:
-            return '3'     # Bow
-
-        if rt > 0.7:
-            return '2'     # Stretch
-        # ---------------- BUTTONS ----------------
-
-        # LB
-        if controller.get_button(4):
-            return '1'
-
-        # RB
-        if controller.get_button(5):
-            return '5'
-
-        # B
-        if controller.get_button(1):
-            return '4'
-
-        # A
-        if controller.get_button(0):
-            return '9'
-
-        # Y
-        if controller.get_button(3):
-            return 'c'
-
-        # X
-        if controller.get_button(2):
-            return 'x'
-
-
-        # ---------------- M1 / M2 ----------------
-        # your logs show these mirror A/B events
-
-        # M1
-        if controller.get_button(6):
-            return '7'
-
-        # M2
-        if controller.get_button(7):
-            return '6'
-
-
-        time.sleep(0.01)
+def get_key_blocking():
+    """Get single keypress (blocking)."""
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        key = sys.stdin.read(1)
+        return key.lower()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 # -------------------------------------------------
@@ -563,12 +511,6 @@ def transition_height(from_z: float, to_z: float):
 # -------------------------------------------------
 
 def main():
-    import pygame
-    pygame.init()
-    pygame.joystick.init()
-    controller = pygame.joystick.Joystick(0)
-    controller.init()
-
     print("=" * 50)
     print("  MULTI-DIRECTIONAL WALK CONTROLLER")
     print("=" * 50)
@@ -620,7 +562,7 @@ def main():
             print(f"Waiting for command (W/A/S/D/Q/E/C/X) [{mode_name}]: ", end="", flush=True)
             
             # Get keypress
-            key = get_key_blocking(controller)
+            key = get_key_blocking()
             print(key.upper())  # Echo the key
             
             if key not in KEY_MAP:

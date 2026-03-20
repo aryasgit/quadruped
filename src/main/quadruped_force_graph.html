@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: transparent; }
+canvas { display: block; width: 100%; }
+#info {
+  position: absolute; top: 8px; left: 8px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+  line-height: 1.8;
+}
+#legend {
+  display: flex; flex-wrap: wrap; gap: 10px 18px;
+  padding: 8px 2px 2px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
+.li { display: flex; align-items: center; gap: 5px; }
+.ls { width: 22px; height: 2px; border-radius: 1px; }
+</style>
+</head>
+<body>
+<div style="position:relative">
+  <canvas id="c"></canvas>
+  <div id="info"></div>
+</div>
+<div id="legend"></div>
+
+<script>
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+const W = 680, H = 600;
+const cv = document.getElementById('c');
+cv.style.width = W + 'px'; cv.style.height = H + 'px';
+cv.width = W * DPR; cv.height = H * DPR;
+const ctx = cv.getContext('2d');
+ctx.scale(DPR, DPR);
+
+const DARK = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+// ── GROUPS ──────────────────────────────────────────────────────
+const GROUPS = {
+  entry:    { color: '#7F77DD', label: 'entry point',      glyph: 'star'    },
+  hardware: { color: '#1D9E75', label: 'hardware L0–L1',   glyph: 'hex'     },
+  layer2:   { color: '#378ADD', label: 'joints L2',        glyph: 'diamond' },
+  layer3:   { color: '#639922', label: 'IK L3',            glyph: 'circle'  },
+  gait:     { color: '#BA7517', label: 'gait',             glyph: 'square'  },
+  stance:   { color: '#D85A30', label: 'stance/tricks',    glyph: 'triangle'},
+  tools:    { color: '#888780', label: 'tools',            glyph: 'cross'   },
+  redundant:{ color: '#B4B2A9', label: 'redundant',        glyph: 'circle'  },
+};
+
+// ── NODES ───────────────────────────────────────────────────────
+const raw_nodes = [
+  // ACTIVE CORE
+  { id: 'main_controller',   label: 'main_controller',   group: 'entry',    r: 14, desc: 'Entry point — orchestrates everything' },
+  { id: 'absolute_truths',   label: 'absolute_truths',   group: 'hardware', r: 12, desc: 'Layer 0 — physical constants, channels, limits' },
+  { id: 'i2c_bus',           label: 'i2c_bus',           group: 'hardware', r: 9,  desc: 'Layer 1.1 — singleton SMBus handle' },
+  { id: 'pca9685',           label: 'pca9685',           group: 'hardware', r: 10, desc: 'Layer 1.2 — servo PWM driver' },
+  { id: 'imu',               label: 'imu',               group: 'hardware', r: 8,  desc: 'Layer 1.3 — MPU6050 + complementary filter' },
+  { id: 'joint_conventions', label: 'joint_conventions', group: 'layer2',   r: 10, desc: 'Layer 2.5 — sign flips, mirror adapter' },
+  { id: 'joint_space',       label: 'joint_space',       group: 'layer2',   r: 10, desc: 'Layer 2 — delta → physical servo angle' },
+  { id: 'util',              label: 'util',              group: 'layer3',   r: 7,  desc: 'RotMatrix3D, point_to_rad helpers' },
+  { id: 'kinematics',        label: 'kinematics',        group: 'layer3',   r: 10, desc: 'Full 3D SpotMicro IK solver' },
+  { id: 'leg_ik',            label: 'leg_ik',            group: 'layer3',   r: 11, desc: 'Public IK interface — solve_all_legs()' },
+  { id: 'gait_generator',    label: 'gait_generator',    group: 'gait',     r: 9,  desc: 'Stance/swing trajectory — _leg_trajectory()' },
+  { id: 'tricks',            label: 'tricks',            group: 'stance',   r: 11, desc: 'Show tricks — shake, bow, bheek, combo…' },
+  // TOOLS
+  { id: 'servo_gui',         label: 'servo_gui',         group: 'tools',    r: 6,  desc: 'Calibration GUI — 12-channel sliders' },
+  { id: 'test_stand',        label: 'test_stand',        group: 'tools',    r: 5,  desc: 'Direct servo stand test' },
+  { id: 'test_coxa_cal',     label: 'test_coxa_cal',     group: 'tools',    r: 5,  desc: 'Coxa calibration verifier' },
+  { id: 'test_walk_v3',      label: 'test_walk_v3',      group: 'tools',    r: 5,  desc: 'Minimal walk test with ramp' },
+  { id: 'test_x_axis',       label: 'test_x_axis',       group: 'tools',    r: 4,  desc: 'Single-leg X-axis sweep' },
+  { id: 'test_y_axis',       label: 'test_y_axis',       group: 'tools',    r: 4,  desc: 'Single-leg Y-axis sweep' },
+  { id: 'test_z_axis',       label: 'test_z_axis',       group: 'tools',    r: 4,  desc: 'Single-leg Z-axis bounce' },
+  { id: 'test_pump',         label: 'test_pump',         group: 'tools',    r: 4,  desc: 'All-legs XYZ symmetry test' },
+  { id: 'test_balance',      label: 'test_balance',      group: 'tools',    r: 5,  desc: 'Static IMU balance test' },
+  { id: 'test_walk_imu',     label: 'test_walk_imu',     group: 'tools',    r: 5,  desc: 'Walk + live IMU compensation' },
+  // REDUNDANT
+  { id: 'old_leg_ik',        label: 'old_leg_ik',        group: 'redundant',r: 5,  desc: 'Superseded 2D-only IK solver' },
+  { id: 'old_posture',       label: 'old_posture',       group: 'redundant',r: 5,  desc: 'Broken — calls init_mpu() at import' },
+  { id: 'posture_gait_only', label: 'posture_gait_only', group: 'redundant',r: 5,  desc: 'Double-mirror bug — do not use' },
+  { id: 'posture_ctrl',      label: 'posture_ctrl',      group: 'redundant',r: 6,  desc: 'IMU posture — future branch' },
+  { id: 'Tricks_v1',         label: 'Tricks_v1',         group: 'redundant',r: 5,  desc: 'Superseded by tricks.py' },
+  { id: 'TricksGUI',         label: 'TricksGUI',         group: 'redundant',r: 5,  desc: 'GUI frontend — future feature' },
+  { id: 'Trot',              label: 'Trot',              group: 'redundant',r: 6,  desc: 'IMU trot — future branch' },
+  { id: 'wireless',          label: 'wireless',          group: 'redundant',r: 5,  desc: 'Identical to main_controller' },
+  { id: 'test_walk_multi',   label: 'test_walk_multi',   group: 'redundant',r: 5,  desc: 'Keyboard version of main_controller' },
+  { id: 'test_walk_v1',      label: 'test_walk_v1',      group: 'redundant',r: 4,  desc: 'FSM approach — superseded' },
+  { id: 'test_walk_v2',      label: 'test_walk_v2',      group: 'redundant',r: 4,  desc: 'Wrong coxa bias position' },
+];
+
+// ── EDGES ───────────────────────────────────────────────────────
+const raw_edges = [
+  // main core imports
+  { s: 'main_controller', t: 'gait_generator',    w: 3 },
+  { s: 'main_controller', t: 'leg_ik',            w: 3 },
+  { s: 'main_controller', t: 'joint_conventions', w: 3 },
+  { s: 'main_controller', t: 'joint_space',       w: 3 },
+  { s: 'main_controller', t: 'pca9685',           w: 3 },
+  { s: 'main_controller', t: 'absolute_truths',   w: 2 },
+  { s: 'main_controller', t: 'tricks',            w: 3 },
+  // hardware chain
+  { s: 'i2c_bus',         t: 'absolute_truths',   w: 2 },
+  { s: 'pca9685',         t: 'i2c_bus',           w: 2 },
+  { s: 'pca9685',         t: 'absolute_truths',   w: 2 },
+  { s: 'imu',             t: 'i2c_bus',           w: 2 },
+  { s: 'imu',             t: 'absolute_truths',   w: 2 },
+  // layer2
+  { s: 'joint_space',     t: 'absolute_truths',   w: 2 },
+  // layer3
+  { s: 'leg_ik',          t: 'kinematics',        w: 2 },
+  { s: 'kinematics',      t: 'util',              w: 2 },
+  // tricks deps
+  { s: 'tricks',          t: 'leg_ik',            w: 2 },
+  { s: 'tricks',          t: 'joint_conventions', w: 2 },
+  { s: 'tricks',          t: 'joint_space',       w: 2 },
+  { s: 'tricks',          t: 'pca9685',           w: 2 },
+  { s: 'tricks',          t: 'absolute_truths',   w: 1 },
+  // tools → core deps
+  { s: 'servo_gui',       t: 'pca9685',           w: 1 },
+  { s: 'servo_gui',       t: 'absolute_truths',   w: 1 },
+  { s: 'test_stand',      t: 'pca9685',           w: 1 },
+  { s: 'test_stand',      t: 'absolute_truths',   w: 1 },
+  { s: 'test_coxa_cal',   t: 'pca9685',           w: 1 },
+  { s: 'test_coxa_cal',   t: 'absolute_truths',   w: 1 },
+  { s: 'test_coxa_cal',   t: 'leg_ik',            w: 1 },
+  { s: 'test_coxa_cal',   t: 'joint_conventions', w: 1 },
+  { s: 'test_coxa_cal',   t: 'joint_space',       w: 1 },
+  { s: 'test_walk_v3',    t: 'gait_generator',    w: 1 },
+  { s: 'test_walk_v3',    t: 'leg_ik',            w: 1 },
+  { s: 'test_walk_v3',    t: 'joint_conventions', w: 1 },
+  { s: 'test_walk_v3',    t: 'joint_space',       w: 1 },
+  { s: 'test_walk_v3',    t: 'pca9685',           w: 1 },
+  { s: 'test_x_axis',     t: 'leg_ik',            w: 1 },
+  { s: 'test_x_axis',     t: 'joint_conventions', w: 1 },
+  { s: 'test_x_axis',     t: 'joint_space',       w: 1 },
+  { s: 'test_x_axis',     t: 'pca9685',           w: 1 },
+  { s: 'test_y_axis',     t: 'leg_ik',            w: 1 },
+  { s: 'test_y_axis',     t: 'joint_conventions', w: 1 },
+  { s: 'test_y_axis',     t: 'joint_space',       w: 1 },
+  { s: 'test_y_axis',     t: 'pca9685',           w: 1 },
+  { s: 'test_z_axis',     t: 'leg_ik',            w: 1 },
+  { s: 'test_z_axis',     t: 'joint_conventions', w: 1 },
+  { s: 'test_z_axis',     t: 'joint_space',       w: 1 },
+  { s: 'test_z_axis',     t: 'pca9685',           w: 1 },
+  { s: 'test_pump',       t: 'leg_ik',            w: 1 },
+  { s: 'test_pump',       t: 'joint_conventions', w: 1 },
+  { s: 'test_pump',       t: 'joint_space',       w: 1 },
+  { s: 'test_pump',       t: 'pca9685',           w: 1 },
+  { s: 'test_balance',    t: 'posture_ctrl',      w: 1 },
+  { s: 'test_balance',    t: 'imu',               w: 1 },
+  { s: 'test_balance',    t: 'joint_conventions', w: 1 },
+  { s: 'test_balance',    t: 'joint_space',       w: 1 },
+  { s: 'test_balance',    t: 'pca9685',           w: 1 },
+  { s: 'test_walk_imu',   t: 'gait_generator',    w: 1 },
+  { s: 'test_walk_imu',   t: 'posture_ctrl',      w: 1 },
+  { s: 'test_walk_imu',   t: 'leg_ik',            w: 1 },
+  { s: 'test_walk_imu',   t: 'imu',               w: 1 },
+  { s: 'test_walk_imu',   t: 'joint_conventions', w: 1 },
+  { s: 'test_walk_imu',   t: 'joint_space',       w: 1 },
+  { s: 'test_walk_imu',   t: 'pca9685',           w: 1 },
+  // redundant refs
+  { s: 'old_leg_ik',       t: 'absolute_truths',   w: 0.5 },
+  { s: 'old_posture',      t: 'imu',               w: 0.5 },
+  { s: 'old_posture',      t: 'leg_ik',            w: 0.5 },
+  { s: 'posture_gait_only',t: 'leg_ik',            w: 0.5 },
+  { s: 'posture_ctrl',     t: 'imu',               w: 0.5 },
+  { s: 'posture_ctrl',     t: 'leg_ik',            w: 0.5 },
+  { s: 'Tricks_v1',        t: 'leg_ik',            w: 0.5 },
+  { s: 'Tricks_v1',        t: 'joint_conventions', w: 0.5 },
+  { s: 'Tricks_v1',        t: 'joint_space',       w: 0.5 },
+  { s: 'Tricks_v1',        t: 'pca9685',           w: 0.5 },
+  { s: 'TricksGUI',        t: 'tricks',            w: 0.5 },
+  { s: 'TricksGUI',        t: 'pca9685',           w: 0.5 },
+  { s: 'Trot',             t: 'leg_ik',            w: 0.5 },
+  { s: 'Trot',             t: 'imu',               w: 0.5 },
+  { s: 'Trot',             t: 'joint_conventions', w: 0.5 },
+  { s: 'Trot',             t: 'joint_space',       w: 0.5 },
+  { s: 'wireless',         t: 'gait_generator',    w: 0.5 },
+  { s: 'wireless',         t: 'leg_ik',            w: 0.5 },
+  { s: 'wireless',         t: 'joint_conventions', w: 0.5 },
+  { s: 'wireless',         t: 'tricks',            w: 0.5 },
+  { s: 'test_walk_multi',  t: 'gait_generator',    w: 0.5 },
+  { s: 'test_walk_multi',  t: 'leg_ik',            w: 0.5 },
+  { s: 'test_walk_multi',  t: 'tricks',            w: 0.5 },
+  { s: 'test_walk_v1',     t: 'gait_generator',    w: 0.5 },
+  { s: 'test_walk_v1',     t: 'leg_ik',            w: 0.5 },
+  { s: 'test_walk_v2',     t: 'gait_generator',    w: 0.5 },
+  { s: 'test_walk_v2',     t: 'leg_ik',            w: 0.5 },
+];
+
+// ── BUILD NODE MAP ───────────────────────────────────────────────
+const NM = {};
+const nodes = raw_nodes.map(n => {
+  const angle = Math.random() * Math.PI * 2;
+  const dist  = 60 + Math.random() * 200;
+  return { ...n, x: W/2 + Math.cos(angle)*dist, y: H/2 + Math.sin(angle)*dist, vx: 0, vy: 0 };
+});
+nodes.forEach(n => NM[n.id] = n);
+
+const edges = raw_edges.map(e => ({ ...e, sn: NM[e.s], tn: NM[e.t] })).filter(e => e.sn && e.tn);
+
+// degree centrality → size boost
+const degree = {};
+edges.forEach(e => {
+  degree[e.s] = (degree[e.s]||0) + 1;
+  degree[e.t] = (degree[e.t]||0) + 1;
+});
+nodes.forEach(n => {
+  n.r = n.r + Math.sqrt(degree[n.id]||0) * 0.8;
+});
+
+// ── FORCE SIMULATION ────────────────────────────────────────────
+const IDEAL = 90;
+const REPEL = 3800;
+const CENTER_F = 0.018;
+const DAMP = 0.82;
+const STEPS = 300;
+
+function simulate() {
+  for (let step = 0; step < STEPS; step++) {
+    // repulsion
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i+1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const d2 = dx*dx + dy*dy + 1;
+        const d  = Math.sqrt(d2);
+        const f  = REPEL / d2;
+        const fx = dx/d * f, fy = dy/d * f;
+        a.vx -= fx; a.vy -= fy;
+        b.vx += fx; b.vy += fy;
+      }
+    }
+    // spring attraction
+    edges.forEach(e => {
+      const a = e.sn, b = e.tn;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d  = Math.sqrt(dx*dx + dy*dy) + 0.01;
+      const f  = (d - IDEAL) * 0.06 * e.w;
+      const fx = dx/d * f, fy = dy/d * f;
+      a.vx += fx; a.vy += fy;
+      b.vx -= fx; b.vy -= fy;
+    });
+    // center gravity
+    nodes.forEach(n => {
+      n.vx += (W/2 - n.x) * CENTER_F;
+      n.vy += (H/2 - n.y) * CENTER_F;
+      n.vx *= DAMP; n.vy *= DAMP;
+      n.x  += n.vx;  n.y  += n.vy;
+    });
+  }
+  // clamp inside canvas with margin
+  nodes.forEach(n => {
+    n.x = Math.max(n.r + 30, Math.min(W - n.r - 30, n.x));
+    n.y = Math.max(n.r + 30, Math.min(H - n.r - 30, n.y));
+  });
+}
+simulate();
+
+// ── GLYPH DRAWING ───────────────────────────────────────────────
+function drawGlyph(ctx, g, x, y, r, color, alpha, hilight) {
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle   = color + (DARK ? '55' : '33');
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = hilight ? 2 : 1;
+
+  ctx.beginPath();
+  if (g === 'circle') {
+    ctx.arc(x, y, r, 0, Math.PI*2);
+  } else if (g === 'hex') {
+    for (let i=0; i<6; i++) {
+      const a = Math.PI/2 + i*Math.PI/3;
+      i===0 ? ctx.moveTo(x+r*Math.cos(a), y+r*Math.sin(a))
+            : ctx.lineTo(x+r*Math.cos(a), y+r*Math.sin(a));
+    }
+    ctx.closePath();
+  } else if (g === 'diamond') {
+    ctx.moveTo(x, y-r*1.2);
+    ctx.lineTo(x+r, y);
+    ctx.lineTo(x, y+r*1.2);
+    ctx.lineTo(x-r, y);
+    ctx.closePath();
+  } else if (g === 'square') {
+    const s = r * 0.85;
+    ctx.rect(x-s, y-s, s*2, s*2);
+  } else if (g === 'triangle') {
+    ctx.moveTo(x, y-r*1.15);
+    ctx.lineTo(x+r, y+r*0.7);
+    ctx.lineTo(x-r, y+r*0.7);
+    ctx.closePath();
+  } else if (g === 'star') {
+    for (let i=0; i<10; i++) {
+      const a = (Math.PI/2) + i * Math.PI/5;
+      const ir = i%2===0 ? r : r*0.45;
+      i===0 ? ctx.moveTo(x+ir*Math.cos(a), y+ir*Math.sin(a))
+            : ctx.lineTo(x+ir*Math.cos(a), y+ir*Math.sin(a));
+    }
+    ctx.closePath();
+  } else if (g === 'cross') {
+    const t = r*0.35;
+    ctx.moveTo(x-t, y-r); ctx.lineTo(x+t, y-r);
+    ctx.lineTo(x+t, y-t); ctx.lineTo(x+r, y-t);
+    ctx.lineTo(x+r, y+t); ctx.lineTo(x+t, y+t);
+    ctx.lineTo(x+t, y+r); ctx.lineTo(x-t, y+r);
+    ctx.lineTo(x-t, y+t); ctx.lineTo(x-r, y+t);
+    ctx.lineTo(x-r, y-t); ctx.lineTo(x-t, y-t);
+    ctx.closePath();
+  }
+  ctx.fill();
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+// edge color gradient between two node colors
+function edgeColor(sColor, tColor, alpha) {
+  return sColor + Math.round(alpha * 255).toString(16).padStart(2,'0');
+}
+
+// ── INTERACTION ─────────────────────────────────────────────────
+let hovered = null;
+let dragging = null;
+let dragOff  = { x: 0, y: 0 };
+
+function getPos(e) {
+  const rect = cv.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+}
+
+function hitTest(mx, my) {
+  for (let i = nodes.length-1; i >= 0; i--) {
+    const n = nodes[i];
+    const dx = mx - n.x, dy = my - n.y;
+    if (dx*dx + dy*dy < (n.r+4)*(n.r+4)) return n;
+  }
+  return null;
+}
+
+function connectedIds(nodeId) {
+  const ids = new Set();
+  edges.forEach(e => {
+    if (e.s === nodeId) ids.add(e.t);
+    if (e.t === nodeId) ids.add(e.s);
+  });
+  return ids;
+}
+
+// ── RENDER ──────────────────────────────────────────────────────
+function render() {
+  ctx.clearRect(0, 0, W, H);
+
+  const hovId    = hovered ? hovered.id : null;
+  const connected = hovId ? connectedIds(hovId) : new Set();
+
+  // edges
+  edges.forEach(e => {
+    const active = hovId && (e.s === hovId || e.t === hovId);
+    const faded  = hovId && !active;
+    const alpha  = faded ? 0.04 : active ? 0.85 : 0.22;
+    const sCol   = GROUPS[e.sn.group].color;
+    const tCol   = GROUPS[e.tn.group].color;
+
+    // gradient edge
+    const grad = ctx.createLinearGradient(e.sn.x, e.sn.y, e.tn.x, e.tn.y);
+    grad.addColorStop(0, sCol + Math.round(alpha*255).toString(16).padStart(2,'0'));
+    grad.addColorStop(1, tCol + Math.round(alpha*255).toString(16).padStart(2,'0'));
+
+    ctx.beginPath();
+    // slight curve via midpoint offset
+    const mx = (e.sn.x + e.tn.x)/2 - (e.tn.y - e.sn.y)*0.08;
+    const my = (e.sn.y + e.tn.y)/2 + (e.tn.x - e.sn.x)*0.08;
+    ctx.moveTo(e.sn.x, e.sn.y);
+    ctx.quadraticCurveTo(mx, my, e.tn.x, e.tn.y);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth   = active ? e.w * 1.8 : e.w * 0.7;
+    ctx.setLineDash(e.w < 1 ? [3,4] : []);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // nodes
+  nodes.forEach(n => {
+    const isHov  = n.id === hovId;
+    const isConn = connected.has(n.id);
+    const faded  = hovId && !isHov && !isConn;
+    const alpha  = faded ? 0.12 : 1;
+    const g      = GROUPS[n.group];
+
+    drawGlyph(ctx, g.glyph, n.x, n.y, n.r, g.color, alpha, isHov || isConn);
+
+    // label
+    if (!faded && (isHov || isConn || n.r > 9)) {
+      ctx.globalAlpha = isHov ? 1 : isConn ? 0.85 : 0.6;
+      ctx.fillStyle   = DARK ? '#d4d2c9' : '#2c2c2a';
+      ctx.font        = `${isHov ? 500 : 400} ${isHov ? 11 : 10}px var(--font-mono, monospace)`;
+      ctx.textAlign   = 'center';
+      ctx.fillText(n.label, n.x, n.y + n.r + 13);
+      ctx.globalAlpha = 1;
+    }
+  });
+}
+
+// ── ANIMATION LOOP ───────────────────────────────────────────────
+let animating = false;
+let frame;
+
+function startAnim() {
+  if (animating) return;
+  animating = true;
+  function loop() {
+    if (!animating) return;
+    // settle remaining momentum
+    nodes.forEach(n => {
+      if (Math.abs(n.vx)+Math.abs(n.vy) > 0.01) {
+        n.vx *= 0.9; n.vy *= 0.9;
+        n.x  += n.vx;  n.y  += n.vy;
+        n.x = Math.max(n.r+20, Math.min(W-n.r-20, n.x));
+        n.y = Math.max(n.r+20, Math.min(H-n.r-20, n.y));
+      }
+    });
+    render();
+    frame = requestAnimationFrame(loop);
+  }
+  frame = requestAnimationFrame(loop);
+}
+
+// ── EVENTS ───────────────────────────────────────────────────────
+const infoEl = document.getElementById('info');
+
+function onMove(e) {
+  e.preventDefault();
+  const { x, y } = getPos(e);
+  if (dragging) {
+    dragging.x = x - dragOff.x;
+    dragging.y = y - dragOff.y;
+    dragging.vx = dragging.vy = 0;
+    render();
+    return;
+  }
+  const hit = hitTest(x, y);
+  if (hit !== hovered) {
+    hovered = hit;
+    render();
+  }
+  if (hit) {
+    cv.style.cursor = 'grab';
+    const g = GROUPS[hit.group];
+    infoEl.innerHTML =
+      `<strong style="color:${g.color}">${hit.label}</strong><br>` +
+      `${hit.desc}<br>` +
+      `<span style="opacity:0.6">group: ${hit.group} · deg: ${degree[hit.id]||0}</span>`;
+  } else {
+    cv.style.cursor = 'default';
+    infoEl.innerHTML = '';
+  }
+}
+
+function onDown(e) {
+  const { x, y } = getPos(e);
+  const hit = hitTest(x, y);
+  if (hit) {
+    dragging = hit;
+    dragOff  = { x: x - hit.x, y: y - hit.y };
+    hit.vx = hit.vy = 0;
+    cv.style.cursor = 'grabbing';
+    if (!animating) startAnim();
+  }
+}
+
+function onUp() {
+  dragging = null;
+  cv.style.cursor = hovered ? 'grab' : 'default';
+}
+
+cv.addEventListener('mousemove',  onMove, { passive: false });
+cv.addEventListener('mousedown',  onDown);
+cv.addEventListener('mouseup',    onUp);
+cv.addEventListener('mouseleave', () => { hovered = null; infoEl.innerHTML=''; render(); });
+cv.addEventListener('touchmove',  onMove, { passive: false });
+cv.addEventListener('touchstart', onDown, { passive: true });
+cv.addEventListener('touchend',   onUp);
+
+// ── LEGEND ───────────────────────────────────────────────────────
+const legEl = document.getElementById('legend');
+Object.entries(GROUPS).forEach(([k, g]) => {
+  legEl.innerHTML += `<div class="li">
+    <div class="ls" style="background:${g.color}"></div>
+    <span>${g.label}</span>
+  </div>`;
+});
+
+render();
+setTimeout(startAnim, 100);
+setTimeout(() => { animating = false; cancelAnimationFrame(frame); render(); }, 3000);
+</script>
+</body>
+</html>
