@@ -36,7 +36,7 @@ from layer2.joint_space import normalize_all
 from hardware.pca9685 import set_servo_angle
 from hardware.absolute_truths import COXA, THIGHS, WRISTS
 # ---------------- Tricks ----------------
-from Parth.Tricks2 import (
+from stance.Tricks2 import (
     stand, shake, bow, wiggle, pushups,
     bheek, high_five, sit, stretch,
     tilt_dance, combo
