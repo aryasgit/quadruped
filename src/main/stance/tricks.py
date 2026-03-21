@@ -29,9 +29,9 @@ import argparse
 from typing import Dict, Tuple
 
 # ── proven pipeline ─────────────────────────────
-from IK.leg_ik import solve_all_legs, _STAND_Y, _STAND_Z
-from layer2.joint_conventions import apply_joint_conventions
-from layer2.joint_space import normalize_all
+from ik.solver import solve_all_legs, _STAND_Y, _STAND_Z
+from joints.conventions import apply_joint_conventions
+from joints.space import normalize_all
 
 # ── hardware ────────────────────────────────────
 from hardware.pca9685 import set_servo_angle, init_pca
