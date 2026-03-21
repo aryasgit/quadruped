@@ -114,20 +114,10 @@ class TrackEKF:
         for _ in range(steps):
             x = self.F @ x
         return float(x[0]), float(x[1])
-    
-    # In world.py — convert vx pixels/frame to m/s
-    # Add after speed_ms property in TrackEKF:
 
-    PX_PER_M_AT_1M = 400.0   # approximate for OAK-D at 640px wide, 73deg FOV
-    
     @property
     def speed_ms(self) -> float:
         return float(math.sqrt(self.x[2]**2 + self.x[3]**2))
-    def speed_ms(self) -> float:
-        # Convert pixel velocity to approximate m/s using depth scaling
-        px_vel = float(math.sqrt(self.x[2]**2 + self.x[3]**2))
-        depth  = max(self.x[0], 0.1)
-        return px_vel * depth / PX_PER_M_AT_1M
 
 
 # ── Occupancy grid ────────────────────────────────────────────────
@@ -231,7 +221,6 @@ class WorldModel:
                 self._ekfs[track.id] = TrackEKF(x_m, y_m, self.dt)
             ekf = self._ekfs[track.id]
             ekf.update(x_m, y_m)
-            print(f"  [world] track={track.id} x={x_m:.2f} y={y_m:.2f}")
 
             # Grid
             self.grid.mark(x_m, y_m)
@@ -249,7 +238,7 @@ class WorldModel:
                 y_05s     = y05,
                 x_10s     = x10,
                 y_10s     = y10,
-                speed_ms  = ekf.speed_ms(),
+                speed_ms  = ekf.speed_ms,
             )
             predictions.append(pred)
 
@@ -258,7 +247,7 @@ class WorldModel:
                 person_present = True
 
             # Closing threat: moving toward robot AND predicted to be <0.6m in 1s
-            if ekf.speed_ms() > 0.3 and x10 < 0.60:
+            if ekf.speed_ms > 0.3 and x10 < 0.60:
                 closing_threat = True
 
         # 4 — spatial awareness
