@@ -64,7 +64,7 @@ See [`docs/hardware/`](docs/hardware/) for full selection rationale, specs, and 
 | Compute | NVIDIA Jetson Orin Nano |
 | Servo Driver | PCA9685 (I2C, address 0x40) |
 | Servos | 12× MG996R (270° travel) |
-| IMU | MPU6050 (I2C, address 0x68) |
+| IMU | HW-290 10DOF (I2C, address 0x68) |
 | Display | SH1106 OLED 128×64 (I2C, address 0x3C) |
 | I2C Bus | Jetson bus 7 |
 | Power | 2S LiPo + 5V BEC |
