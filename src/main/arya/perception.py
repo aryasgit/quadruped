@@ -113,32 +113,40 @@ def _build_pipeline() -> dai.Pipeline:
     cam_right.out.link(stereo.right)
 
     # --- RGB camera ---
+    # --- RGB camera ---
     cam_rgb = pipeline.create(dai.node.ColorCamera)
     cam_rgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
-    cam_rgb.setPreviewSize(300, 300)   # detection input
-    cam_rgb.setVideoSize(640, 480)     # display stream
+    cam_rgb.setPreviewSize(672, 384)   # pedveh native resolution
+    cam_rgb.setVideoSize(640, 480)
     cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
     cam_rgb.setInterleaved(False)
     cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
     cam_rgb.setFps(12)
 
-    # --- MobileNet-SSD (general 20-class) ---
+    # --- Resize 672x384 → 300x300 for MobileNet ---
+    manip = pipeline.create(dai.node.ImageManip)
+    manip.initialConfig.setResize(300, 300)
+    manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
+    manip.inputImage.setBlocking(False)
+    manip.inputImage.setQueueSize(1)
+    cam_rgb.preview.link(manip.inputImage)
+
+    # --- MobileNet-SSD — gets resized 300x300 feed ---
     mobilenet = pipeline.create(dai.node.MobileNetDetectionNetwork)
     mobilenet.setConfidenceThreshold(MOBILENET_CONF)
-    mobilenet.setBlobPath(
-        blobconverter.from_zoo("mobilenet-ssd", shaves=3))
+    mobilenet.setBlobPath(blobconverter.from_zoo("mobilenet-ssd", shaves=3))
     mobilenet.setNumInferenceThreads(1)
     mobilenet.input.setBlocking(False)
-    cam_rgb.preview.link(mobilenet.input)
+    manip.out.link(mobilenet.input)   # <-- manip, not cam_rgb.preview
 
-    # --- Pedestrian + vehicle detector ---
+    # --- Pedestrian + vehicle — gets native 672x384 feed ---
     pedveh = pipeline.create(dai.node.MobileNetDetectionNetwork)
     pedveh.setConfidenceThreshold(PEDVEH_CONF)
     pedveh.setBlobPath(blobconverter.from_zoo(
         "pedestrian-and-vehicle-detector-adas-0001", shaves=3))
     pedveh.setNumInferenceThreads(1)
     pedveh.input.setBlocking(False)
-    cam_rgb.preview.link(pedveh.input)
+    cam_rgb.preview.link(pedveh.input)   # <-- direct, correct size
 
     # --- Outputs ---
     xout_depth = pipeline.create(dai.node.XLinkOut)
