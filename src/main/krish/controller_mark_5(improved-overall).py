@@ -30,11 +30,47 @@ Analog stick deflection maps to walk speed:
   Release stick     → smooth ramp-out to stand
 """
 
+
 import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import time
+WATCHDOG_TIMEOUT = 15.0  # seconds
+watchdog_last_heartbeat = [time.time()]
+
+def watchdog_thread():
+    while True:
+        time.sleep(1.0)
+        elapsed = time.time() - watchdog_last_heartbeat[0]
+        if elapsed > WATCHDOG_TIMEOUT:
+            print(f"\n[WATCHDOG] Main loop unresponsive for {elapsed:.1f} seconds. Restarting controller...\n")
+            try:
+                execute_step(stand_at_z(STANCE_Z))
+            except Exception:
+                pass
+            python = sys.executable
+            os.execv(python, [python] + sys.argv)
+import os)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..')
+
+
+import threading
+def run_trick_with_timeout(trick_func, timeout=10.0):
+    """Run a trick function with a timeout. If it hangs, return False."""
+    result = [None]
+    def target():
+        try:
+            trick_func()
+            result[0] = True
+        except Exception as e:
+            print(f"[ERROR] Trick failed: {e}")
+            result[0] = False
+    t = threading.Thread(target=target)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        print(f"[WARN] Trick timed out, forcing stand pose.")
+        return False
+    return result[0]
 import math
 import tty
 import termios
@@ -70,16 +106,20 @@ from stance.tricks import (
 # GAIT CONFIG (defaults for D-pad / keyboard)
 # -------------------------------------------------
 
-FREQ = 1.5
+
+# Increased for more pronounced forward/backward walking
+
+# Reduced for more stability
+FREQ = 1.3  # was 1.6
 DT = 0.02  # 50 Hz
 
-STEP_LENGTH = 0.06
-STEP_HEIGHT = 0.030
+STEP_LENGTH = 0.10  # was 0.13
+STEP_HEIGHT = 0.045
 DUTY = 0.80
 
-LATERAL_STEP_LENGTH = 0.04
-LATERAL_STEP_HEIGHT = 0.020
-LATERAL_FREQ = 1.5
+LATERAL_STEP_LENGTH = 0.03  # was 0.04
+LATERAL_STEP_HEIGHT = 0.018  # was 0.020
+LATERAL_FREQ = 1.2  # was 1.5
 
 STANCE_X = 0.0
 STANCE_Y = 0.07
@@ -97,10 +137,12 @@ RAMP_MIN  = 0.05
 # -------------------------------------------------
 
 ANALOG_DEADZONE   = 0.15     # Ignore stick drift below this
-ANALOG_FREQ_MIN   = 0.6      # Hz at minimum deflection
-ANALOG_FREQ_MAX   = 2.8      # Hz at full tilt
-ANALOG_STEP_MIN   = 0.25     # Step-length multiplier at min deflection
-ANALOG_STEP_MAX   = 1.0      # Step-length multiplier at full tilt
+
+# Analog stick: reduce frequency and step scaling for more stability
+ANALOG_FREQ_MIN   = 0.5      # was 0.6
+ANALOG_FREQ_MAX   = 2.2      # was 2.8
+ANALOG_STEP_MIN   = 0.20     # was 0.25
+ANALOG_STEP_MAX   = 0.8      # was 1.0
 
 # Stick axes (Xbox-style layout — adjust if your pad differs)
 AXIS_LX = 0   # Left stick X  → strafe
@@ -120,7 +162,7 @@ ANALOG_RAMP_DOWN = 4.0       # 1→0 in 0.25 s
 
 BODY_SHIFT_FWD  = 0.010      # Forward / backward lean
 BODY_SHIFT_LAT  = 0.008      # Lateral (strafe) lean
-BODY_SHIFT_TURN = 0.006      # Turn lean (shifts sideways into turn)
+BODY_SHIFT_TURN = 0.012      # More body lean during turn
 
 # -------------------------------------------------
 # DIRECTION CONFIG (keyboard / D-pad)
@@ -153,9 +195,9 @@ FORWARD_BACKWARD = ("forward", "backward")
 LEFT_RIGHT       = ("left", "right")
 TURN             = ("turn_left", "turn_right")
 
-TURN_STEP_LENGTH = 0.04
-TURN_STEP_HEIGHT = 0.025
-TURN_FREQ        = 1.5
+TURN_STEP_LENGTH = 0.07  # was 0.09
+TURN_STEP_HEIGHT = 0.032 # was 0.035
+TURN_FREQ        = 1.2   # was 1.5
 
 # -------------------------------------------------
 # TRICK MAP
@@ -610,6 +652,10 @@ def get_key_from_keyboard():
 # =====================================================================
 
 def main_gamepad(controller, gamepad_name: str):
+    # Start watchdog thread
+    if not hasattr(main_gamepad, "_watchdog_started"):
+        threading.Thread(target=watchdog_thread, daemon=True).start()
+        main_gamepad._watchdog_started = True
     print(f"[INPUT] Gamepad detected: {gamepad_name}")
     print("        Analog sticks for proportional movement.\n")
     print("Analog Controls:")
@@ -642,14 +688,15 @@ def main_gamepad(controller, gamepad_name: str):
     last_turn    = 0.0
 
     # Init stand
-    print("[INIT] Moving to stand pose...")
+    print(f"[INIT] Moving to stand pose...")
     execute_step(STAND_FEET)
     time.sleep(0.5)
-    print("[INIT] Ready!")
+    print(f"[INIT] Ready!")
     print("-" * 55)
 
     try:
         while True:
+            watchdog_last_heartbeat[0] = time.time()
             loop_top = time.time()
             pygame.event.pump()
 
@@ -658,7 +705,7 @@ def main_gamepad(controller, gamepad_name: str):
             if btn is not None:
                 cmd = KEY_MAP.get(btn)
                 if cmd == "quit":
-                    print("\n[QUIT] Exiting...")
+                    print(f"\n{C.RED}{C.BOLD}[QUIT]{C.RESET} Exiting...")
                     break
 
                 if cmd == "height":
@@ -683,10 +730,9 @@ def main_gamepad(controller, gamepad_name: str):
                         ramp_level = 0.0
                         phase = 0.0
                     print(f"\n  Trick: {cmd.upper()}")
-                    try:
-                        TRICK_MAP[cmd]()
-                    except Exception as e:
-                        print(f"  [WARN] Trick error: {e}")
+                    success = run_trick_with_timeout(TRICK_MAP[cmd], timeout=10.0)
+                    if not success:
+                        print(f"[FAIL] Trick did not complete in time or failed. Returning to stand pose.")
                     stand()
                     _wait_button_release(controller)
                     continue
@@ -810,6 +856,10 @@ def _wait_button_release(controller):
 # =====================================================================
 
 def main_keyboard():
+    # Start watchdog thread
+    if not hasattr(main_keyboard, "_watchdog_started"):
+        threading.Thread(target=watchdog_thread, daemon=True).start()
+        main_keyboard._watchdog_started = True
     if pygame is None:
         print("[INPUT] pygame not installed — using keyboard controls.\n")
     else:
@@ -839,6 +889,7 @@ def main_keyboard():
 
     try:
         while True:
+            watchdog_last_heartbeat[0] = time.time()
             mode_name = HEIGHT_MODES[height_index][0]
             print(f"\nWaiting for command [{mode_name}]: ", end="", flush=True)
 
@@ -865,10 +916,9 @@ def main_keyboard():
 
             elif command in TRICK_MAP:
                 print(f"  Trick: {command.upper()}")
-                try:
-                    TRICK_MAP[command]()
-                except Exception as e:
-                    print(f"  [WARN] Trick error: {e}")
+                success = run_trick_with_timeout(TRICK_MAP[command], timeout=10.0)
+                if not success:
+                    print("[FAIL] Trick did not complete in time or failed. Returning to stand pose.")
                 stand()
 
             else:

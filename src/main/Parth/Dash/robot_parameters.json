@@ -1,0 +1,336 @@
+{
+  "kinematics": {
+    "link_lengths_m": {
+      "coxa_link1": 0.01605,
+      "thigh_link2": 0.10832,
+      "shin_wrist_link3": 0.13476
+    },
+    "link_lengths_mm": {
+      "coxa_link1": 16.05,
+      "thigh_link2": 108.32,
+      "shin_wrist_link3": 134.76
+    },
+    "body_dimensions_m": {
+      "length": 0.2083,
+      "width": 0.0789,
+      "height": 0.074
+    },
+    "body_dimensions_mm": {
+      "length": 208.3,
+      "width": 78.9,
+      "height": 74.0
+    },
+    "phi_angle_rad": 1.5707963267948966,
+    "phi_angle_deg": 90.0,
+    "leg_origins_m": [
+      [
+        0.10415,
+        0.03945,
+        0.0
+      ],
+      [
+        -0.10415,
+        0.03945,
+        0.0
+      ],
+      [
+        -0.10415,
+        -0.03945,
+        0.0
+      ],
+      [
+        0.10415,
+        -0.03945,
+        0.0
+      ]
+    ],
+    "leg_origins_mm": [
+      [
+        104.15,
+        39.449999999999996,
+        0.0
+      ],
+      [
+        -104.15,
+        39.449999999999996,
+        0.0
+      ],
+      [
+        -104.15,
+        -39.449999999999996,
+        0.0
+      ],
+      [
+        104.15,
+        -39.449999999999996,
+        0.0
+      ]
+    ]
+  },
+  "hardware": {
+    "i2c": {
+      "bus_number": 7,
+      "pca9685_address": "0x40",
+      "mpu6050_address": "0x68"
+    },
+    "pca9685": {
+      "mode1_register": "0x00",
+      "prescale_register": "0xFE",
+      "pulse_min": 106,
+      "pulse_max": 535,
+      "pulse_range": 429
+    },
+    "mpu6050": {
+      "power_mgmt_register": "0x6B",
+      "accel_register": "0x3B",
+      "gyro_register": "0x43"
+    }
+  },
+  "servo_channels": {
+    "wrists": {
+      "WFR": 10,
+      "WFL": 11,
+      "WRR": 4,
+      "WRL": 5
+    },
+    "thighs": {
+      "TFR": 8,
+      "TFL": 9,
+      "TRR": 2,
+      "TRL": 3
+    },
+    "coxa": {
+      "FR": 6,
+      "FL": 7,
+      "RR": 0,
+      "RL": 1
+    },
+    "all_by_channel": {
+      "0": {
+        "servo": "RR",
+        "type": "Coxa",
+        "joint": "RR Coxa"
+      },
+      "1": {
+        "servo": "RL",
+        "type": "Coxa",
+        "joint": "RL Coxa"
+      },
+      "2": {
+        "servo": "TRR",
+        "type": "Thigh",
+        "joint": "RR Thigh"
+      },
+      "3": {
+        "servo": "TRL",
+        "type": "Thigh",
+        "joint": "RL Thigh"
+      },
+      "4": {
+        "servo": "WRR",
+        "type": "Wrist",
+        "joint": "RR Wrist"
+      },
+      "5": {
+        "servo": "WRL",
+        "type": "Wrist",
+        "joint": "RL Wrist"
+      },
+      "6": {
+        "servo": "FR",
+        "type": "Coxa",
+        "joint": "FR Coxa"
+      },
+      "7": {
+        "servo": "FL",
+        "type": "Coxa",
+        "joint": "FL Coxa"
+      },
+      "8": {
+        "servo": "TFR",
+        "type": "Thigh",
+        "joint": "FR Thigh"
+      },
+      "9": {
+        "servo": "TFL",
+        "type": "Thigh",
+        "joint": "FL Thigh"
+      },
+      "10": {
+        "servo": "WFR",
+        "type": "Wrist",
+        "joint": "FR Wrist"
+      },
+      "11": {
+        "servo": "WFL",
+        "type": "Wrist",
+        "joint": "FL Wrist"
+      }
+    }
+  },
+  "joint_limits": {
+    "wrists": {
+      "WFL": {
+        "min_deg": 0,
+        "max_deg": 200,
+        "perpendicular_deg": 153,
+        "range_deg": 200
+      },
+      "WRL": {
+        "min_deg": 0,
+        "max_deg": 200,
+        "perpendicular_deg": 153,
+        "range_deg": 200
+      },
+      "WFR": {
+        "min_deg": 200,
+        "max_deg": 0,
+        "perpendicular_deg": 47,
+        "range_deg": 200
+      },
+      "WRR": {
+        "min_deg": 200,
+        "max_deg": 0,
+        "perpendicular_deg": 47,
+        "range_deg": 200
+      }
+    },
+    "thighs": {
+      "TFL": {
+        "min_deg": 0,
+        "max_deg": 270,
+        "perpendicular_deg": 128,
+        "range_deg": 270
+      },
+      "TRL": {
+        "min_deg": 0,
+        "max_deg": 270,
+        "perpendicular_deg": 135,
+        "range_deg": 270
+      },
+      "TFR": {
+        "min_deg": 270,
+        "max_deg": 0,
+        "perpendicular_deg": 138,
+        "range_deg": 270
+      },
+      "TRR": {
+        "min_deg": 270,
+        "max_deg": 0,
+        "perpendicular_deg": 140,
+        "range_deg": 270
+      }
+    },
+    "coxa": {
+      "FL": {
+        "min_deg": 0,
+        "max_deg": 90,
+        "perpendicular_deg": 39,
+        "range_deg": 90
+      },
+      "RL": {
+        "min_deg": 0,
+        "max_deg": 90,
+        "perpendicular_deg": 50,
+        "range_deg": 90
+      },
+      "FR": {
+        "min_deg": 90,
+        "max_deg": 0,
+        "perpendicular_deg": 47,
+        "range_deg": 90
+      },
+      "RR": {
+        "min_deg": 90,
+        "max_deg": 0,
+        "perpendicular_deg": 44,
+        "range_deg": 90
+      }
+    }
+  },
+  "stand_pose": {
+    "wrists": {
+      "WFR": 122,
+      "WFL": 78,
+      "WRR": 122,
+      "WRL": 78
+    },
+    "thighs": {
+      "TFR": 98,
+      "TFL": 168,
+      "TRR": 100,
+      "TRL": 175
+    },
+    "coxa": {
+      "FR": 47,
+      "FL": 39,
+      "RR": 44,
+      "RL": 50
+    }
+  },
+  "joint_order": {
+    "canonical_order": [
+      "FL_COXA",
+      "FL_THIGH",
+      "FL_WRIST",
+      "FR_COXA",
+      "FR_THIGH",
+      "FR_WRIST",
+      "RR_COXA",
+      "RR_THIGH",
+      "RR_WRIST",
+      "RL_COXA",
+      "RL_THIGH",
+      "RL_WRIST"
+    ],
+    "leg_mapping": {
+      "LF": [
+        "FL_COXA",
+        "FL_THIGH",
+        "FL_WRIST"
+      ],
+      "RF": [
+        "FR_COXA",
+        "FR_THIGH",
+        "FR_WRIST"
+      ],
+      "RR": [
+        "RR_COXA",
+        "RR_THIGH",
+        "RR_WRIST"
+      ],
+      "LR": [
+        "RL_COXA",
+        "RL_THIGH",
+        "RL_WRIST"
+      ]
+    }
+  },
+  "cad_measurements_mm": {
+    "shoulder_axis_width": 70.0,
+    "shoulder_servo_spacing": 78.0,
+    "mounting_plate_width": 97.0,
+    "mounting_plate_length": 148.0,
+    "chassis_front_width": 114.0,
+    "chassis_total_length": 245.631,
+    "chassis_height": 70.0,
+    "upper_compartment_height": 49.513,
+    "upper_compartment_width": 77.0,
+    "upper_compartment_length": 40.0,
+    "lower_compartment_depth": 26.93,
+    "back_compartment_width": 100.0,
+    "back_compartment_height": 63.43,
+    "back_compartment_depth": 27.0,
+    "straightened_leg_total": 113.92,
+    "measured_shin_link": 134.76,
+    "shoulder_to_body_center": 207.5
+  },
+  "derived": {
+    "max_leg_reach_mm": 243.08,
+    "min_leg_reach_mm": 26.44,
+    "total_servos": 12,
+    "degrees_of_freedom": 12,
+    "legs": 4,
+    "dof_per_leg": 3
+  }
+}

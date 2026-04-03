@@ -39,7 +39,7 @@ from joints.space import normalize_all
 # --- Stability controller ---
 # stability_controller.posture_step returns fully-processed servo angles.
 # Send with send_physical() — do NOT pass through send_deltas().
-from joints.stability_controller import posture_step, reset_reference, _dz
+from controllers.stability_controller import posture_step, reset_reference, _dz
 
 
 # -------------------------------------------------

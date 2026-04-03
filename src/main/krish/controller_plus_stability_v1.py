@@ -64,7 +64,7 @@ from hardware.absolute_truths import COXA, THIGHS, WRISTS
 from hardware.imu import init_mpu, calibrate, IMUFilter
 
 # ---------------- Stability controller ----------------
-from joints.stability_controller import posture_step, reset_reference, _dz
+from controllers.stability_controller import posture_step, reset_reference, _dz
 
 # ---------------- Tricks ----------------
 from stance.tricks import (
