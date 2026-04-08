@@ -84,11 +84,11 @@ LEGS = ("FL", "FR", "RL", "RR")
 # Lower to 5 if still too insensitive; raise if you get false
 # triggers during normal walking.
 
-ROLL_SHOVE_THRESHOLD  = 8.0    # deg/s — more sensitive
-PITCH_SHOVE_THRESHOLD = 6.0    # deg/s — more sensitive
+ROLL_SHOVE_THRESHOLD  = 16.0    # deg/s — less sensitive
+PITCH_SHOVE_THRESHOLD = 12.0    # deg/s — less sensitive
 
-ROLL_EXIT_THRESHOLD   = 6.0     # deg/s — exit (less jitter)
-PITCH_EXIT_THRESHOLD  = 4.5     # deg/s — exit (less jitter)
+ROLL_EXIT_THRESHOLD   = 8.0     # deg/s — exit
+PITCH_EXIT_THRESHOLD  = 6.0     # deg/s — exit
 
 # --- Baseline extraction ---------------------------------------------
 #
@@ -111,8 +111,8 @@ BASELINE_ALPHA = 0.008
 #   Medium push  ~30 deg/s → 0.0012 × 30 = 0.036m = 36mm  ← strong brace
 #   Hard shove   ~60 deg/s → 0.0012 × 60 = 0.072m → clamped to 40mm
 
-ROLL_GAIN  = 0.0008     # m per deg/s — moderate
-PITCH_GAIN = 0.0007     # m per deg/s — moderate
+ROLL_GAIN  = 0.0007     # m per deg/s — less aggressive
+PITCH_GAIN = 0.0006     # m per deg/s — less aggressive
 
 # --- Attack smoothing ------------------------------------------------
 #

@@ -95,12 +95,14 @@ BASE_Z = -0.18   # nominal stand height (metres)
 
 # Correction speed (metres of Z per second at maximum error)
 # At 50 Hz each tick moves dz by at most: RATE / 50 = RATE * dt
-PITCH_RATE = 0.08    # start here, raise if too slow to react
-ROLL_RATE  = 0.10    # roll usually needs slightly faster correction
 
-# Deadband — don't nudge if tilt is within this many degrees
-# Prevents constant micro-jitter at rest
-DEADBAND_DEG = 1.0
+
+# Further increased rates for even faster correction
+PITCH_RATE = 0.32    # 4x original for much faster pitch correction
+ROLL_RATE  = 0.40    # 4x original for much faster roll correction
+
+# Lower deadband for higher sensitivity
+DEADBAND_DEG = 0.5   # reduced for more sensitivity
 
 # Maximum Z correction per leg (metres)
 # Keeps feet within safe IK workspace
