@@ -23,8 +23,15 @@ _Last updated: 2026-06-11_
 
 ## Open questions for Aryaman
 
-- Physical chassis tape-measure vs URDF: body shell ≈ 238 × 110 × 70 mm,
-  axle-to-axle 186 × 78 mm — confirmed?
+- **Chassis is NOT dimensionally identical to the spotMicro URDF** (see
+  RESEARCH_LOG 2026-06-11): lateral 78 and height 70 match exactly, but CAD
+  says axle span 207.5 vs 186, overall 345.6 vs ≈327, legs 113.92/134.76 vs
+  107.5/130. Tape-measure on the real robot, joint-axis to joint-axis:
+  1. front coxa shaft → rear coxa shaft (CAD claims 207.5 — confirm endpoints)
+  2. thigh axis → knee axis (CAD 113.92)
+  3. knee axis → foot ground-contact center (CAD 134.76)
+  4. coxa axis → thigh axis lateral offset (URDF hip_link 55 — not in CAD shots)
+  Also: is the CAD the as-built robot, or a stylized remodel of it?
 - Are all 12 servos still mounted per the legacy channel map (truths.py)?
 - DS3240MG variant: 270° assumed (legacy stack + measured range agree); any
   datasheet/spec sheet on hand to confirm pulse spec (commonly 500–2500 µs)?

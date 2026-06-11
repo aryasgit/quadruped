@@ -29,13 +29,35 @@ ported verbatim to `stack/barq1/truths.py`):
   angle equals its perpendicular (legs vertical at stand) — strong evidence
   these numbers are genuine measurements, not copy-paste.
 
-**URDF chassis confirmation** (spotMicro `spot_micro.urdf.xacro`):
-collision body = three boxes sharing a 110 × 70 mm cross-section: center
-**140 mm** + front **58 mm** + rear **40 mm** → **238 × 110 × 70 mm** overall.
-Kinematic wireframe (`spot_micro_motion_cmd.yaml`): shoulder-to-shoulder
-**186 mm** (length), hip-to-hip **78 mm** (width); links: hip 55 mm, upper leg
-107.5 mm, lower leg 130 mm. Awaiting Aryaman's tape-measure confirmation
-against the physical chassis before we adopt the URDF wholesale.
+**URDF chassis dimensions** (spotMicro `spot_micro.urdf.xacro`) — corrected
+same-day; an earlier reading summed the body boxes as if contiguous (238 mm)
+and missed that the two hip-servo modules sit between them. Actual length
+composition, nose→tail, all sections 110 wide × 70 tall:
+nose cover **58** | hip module **44** (coxa shaft at its center) | center
+shell **140** | hip module **44** | tail cover **40** → **overall ≈ 326–329 mm
+including both covers** (±2 mm box-placement slop in the upstream model; the
+upstream front/rear collision boxes also carry swapped x-signs — lengths are
+trustworthy, placements sloppy). Coxa shafts at x = ±93 → **shaft-to-shaft
+186 mm**; that, not any shell number, is the kinematic `body_length`.
+Wireframe (`spot_micro_motion_cmd.yaml`): body 186 × 78 (hip-to-hip lateral);
+links: hip 55, upper leg 107.5, lower leg 130.
+
+**URDF vs BARQ CAD cross-check** (assets/*.jpeg, Aryaman's annotated CAD).
+Exact matches: hip↔hip lateral **78 = 78**, shell height **70 = 70**;
+near match: width 114 vs 110–116. Mismatches: shoulder-axle span **207.5 vs
+186** (+21.5), overall **345.6 vs ≈327** (+19), mounting plate **148 vs 140**
+(+8), upper leg **113.92 vs 107.5** (+6.4), lower leg **134.76 vs 130** (+4.8).
+Front/rear overhang beyond the axles is ~equal in both (≈138 vs ≈141 mm) —
+the stretch is concentrated between the axles. Conclusion: **same
+architecture, NOT dimensionally identical**; the v1 chassis appears to be a
+longitudinally stretched spotMicro with slightly longer leg links. The URDF
+is adoptable as structure but ~5 parameters must be re-fit to the as-built
+robot (xacro: shiftx, body/front/rear lengths, leg_length, foot_length;
+kinematics: body_length, upper/lower link lengths, hip offset). Running
+spotMicro's stock numbers on this geometry would bias every foot target by
+roughly the half-stretch (~10 mm) plus link errors. Pending: physical
+tape-measure of the four decisive numbers and confirmation of what the CAD's
+207.5 dimension actually spans.
 
 **Hardware scan.** `i2cdetect -y -r 7` showed no devices — servo board was
 unpowered at the time. Not a fault finding; re-scan with electronics powered.
