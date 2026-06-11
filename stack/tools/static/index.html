@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BARQ v1 — Servo Calibration</title>
+<style>
+  :root {
+    --bg: #101116; --panel: #1a1c23; --panel2: #22242e; --line: #2e313d;
+    --fg: #e6e8ee; --dim: #9aa0b0; --accent: #4da3ff; --green: #3ddc84;
+    --amber: #ffc24d; --red: #ff5252;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap;
+           gap: 10px; align-items: center; padding: 10px 14px;
+           background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; font-weight: 650; }
+  .badge { padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.hw  { background: #103524; color: var(--green); }
+  .badge.sim { background: #3a2e10; color: var(--amber); }
+  .meta { color: var(--dim); font-size: 12px; }
+  .spacer { flex: 1; }
+  button { background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+           border-radius: 7px; padding: 6px 11px; cursor: pointer; font-size: 13px; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.danger { background: #3a1212; border-color: #6e2020; color: var(--red);
+                  font-weight: 700; padding: 8px 16px; }
+  button.danger:hover { background: #561818; border-color: var(--red); }
+  button.primary { border-color: var(--accent); color: var(--accent); }
+  .warnbar { background: #2b2410; color: var(--amber); padding: 6px 14px;
+             font-size: 12.5px; border-bottom: 1px solid var(--line); }
+  main { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+         padding: 14px; max-width: 1700px; margin: 0 auto; }
+  @media (max-width: 1280px) { main { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 720px)  { main { grid-template-columns: 1fr; } }
+  .leg h2 { font-size: 13px; letter-spacing: .12em; color: var(--dim);
+            margin: 2px 0 8px 2px; text-transform: uppercase; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+          padding: 10px 12px; margin-bottom: 12px; }
+  .card.enabled { border-color: #2e5d40; }
+  .card h3 { margin: 0; font-size: 14px; display: flex; align-items: center; gap: 7px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #555; flex: none; }
+  .card.enabled .dot { background: var(--green); }
+  .readout { display: flex; gap: 12px; align-items: baseline; margin: 7px 0 2px; }
+  .ticks { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; }
+  .card.unlocked input[type=range] { accent-color: var(--amber); }
+  .bounds { display: flex; justify-content: space-between; color: var(--dim);
+            font-size: 11px; margin-bottom: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; align-items: center; }
+  .row button { padding: 3px 9px; font-size: 12.5px; }
+  .row .lab { color: var(--dim); font-size: 12px; }
+  label.unlock { color: var(--dim); font-size: 12px; display: flex; gap: 4px;
+                 align-items: center; margin-left: auto; cursor: pointer; }
+  .calib { border-top: 1px dashed var(--line); margin-top: 9px; padding-top: 8px; }
+  .calib input[type=number] { width: 62px; background: var(--panel2); color: var(--fg);
+                              border: 1px solid var(--line); border-radius: 6px;
+                              padding: 3px 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px;
+          padding: 1px 9px; font-size: 11.5px; color: var(--dim); }
+  .fit { margin-top: 6px; font-size: 12.5px; color: var(--green);
+         font-variant-numeric: tabular-nums; }
+  .fit.none { color: var(--dim); }
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+           background: var(--panel2); border: 1px solid var(--accent); color: var(--fg);
+           padding: 9px 16px; border-radius: 9px; opacity: 0; transition: opacity .25s;
+           pointer-events: none; z-index: 99; max-width: 80vw; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>BARQ v1 · servo calibration</h1>
+  <span id="mode" class="badge sim">…</span>
+  <span id="hwinfo" class="meta"></span>
+  <span class="spacer"></span>
+  <button id="poseStand">Pose: stand</button>
+  <button id="posePerp">Pose: perpendicular</button>
+  <button id="save" class="primary">Save calibration</button>
+  <button id="refresh">Refresh</button>
+  <button id="alloff" class="danger">ALL OFF (esc)</button>
+</header>
+<div class="warnbar">
+  Robot on a stand, legs hanging free. Servos are <b>off</b> until you enable them —
+  enabling snaps the servo to the slider value. Off = free-wheel (hand-position the link,
+  then enable near it). Method: mark <b>TRUE ZERO</b> at the link's 0° reference, then one
+  more point (±90° links 2–3, ±45° link 1) — per spotMicro servo_calibration.md.
+</div>
+<main id="main"></main>
+<div id="toast"></div>
+
+<script>
+const $ = (sel, el=document) => el.querySelector(sel);
+const LEG_TITLES = { FL: "Front Left", FR: "Front Right", RL: "Rear Left", RR: "Rear Right" };
+const JOINT_ORDER = ["coxa", "thigh", "wrist"];
+let CARDS = {};   // name -> {el, slider, ...}
+let BUSY = false;
+
+function toast(msg, ms=2600) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+async function post(url, body) {
+  const r = await fetch(url, { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}) });
+  const data = await r.json();
+  if (!r.ok) { toast("⚠ " + (data.error || r.statusText)); throw new Error(data.error); }
+  return data;
+}
+
+function fmt(s) {
+  return { us: s.us.toFixed(1), leg: s.legacy_deg.toFixed(1) };
+}
+
+function buildCard(s) {
+  const el = document.createElement("div");
+  el.className = "card"; el.id = "card-" + s.name;
+  el.innerHTML = `
+    <h3><span class="dot"></span>${s.name.replace("_", " · ")}
+        <span class="meta">ch ${s.channel} · ${s.sm_id}${s.inverted ? " · inv-mount" : ""}</span></h3>
+    <div class="readout">
+      <span class="ticks">— </span>
+      <span class="sub us"></span><span class="sub leg"></span>
+    </div>
+    <input type="range" min="${s.lo}" max="${s.hi}" value="${s.ticks}" step="1"
+           list="dl-${s.name}">
+    <datalist id="dl-${s.name}">
+      <option value="${s.perp}"></option><option value="${s.stand}"></option>
+    </datalist>
+    <div class="bounds"><span class="blo"></span><span class="bhi"></span></div>
+    <div class="row">
+      <button data-n="-10">−10</button><button data-n="-1">−1</button>
+      <button data-n="+1">+1</button><button data-n="+10">+10</button>
+      <span class="lab">ticks</span>
+      <label class="unlock"><input type="checkbox" class="unlockbox">full range</label>
+    </div>
+    <div class="row">
+      <button class="enable primary">Enable @ slider</button>
+      <button class="off">Off (free-wheel)</button>
+      <span class="lab">go:</span>
+      <button class="goto" data-t="perp">perp ${s.perp}</button>
+      <button class="goto" data-t="stand">stand ${s.stand}</button>
+      <button class="goto gozero" data-t="zero" disabled>zero</button>
+    </div>
+    <div class="calib">
+      <div class="row">
+        <button class="zero primary">Set TRUE ZERO here (0°)</button>
+        <button class="rec">Record @</button>
+        <input type="number" class="refang" value="${s.name.includes("coxa") ? 45 : 90}" step="5">°
+        <button class="clear">Clear</button>
+      </div>
+      <div class="chips"></div>
+      <div class="fit none">no fit yet — record 2 points</div>
+    </div>`;
+
+  const c = {
+    el, name: s.name,
+    slider: $("input[type=range]", el),
+    enabled: s.enabled,
+  };
+
+  // --- slider: live-command only while enabled; throttled ---
+  let pend = null, timer = null;
+  const sendTicks = async (v) => {
+    const st = await post(`/api/servo/${s.name}/command`, { ticks: v });
+    updateCard(st);
+  };
+  c.slider.addEventListener("input", () => {
+    paintReadout(c, +c.slider.value);
+    if (!c.enabled) return;
+    pend = +c.slider.value;
+    if (!timer) timer = setTimeout(() => { timer = null; sendTicks(pend); }, 60);
+  });
+  c.slider.addEventListener("change", () => { if (c.enabled) sendTicks(+c.slider.value); });
+
+  $("div.row", el).querySelectorAll("button[data-n]").forEach(b =>
+    b.addEventListener("click", () => {
+      c.slider.value = +c.slider.value + +b.dataset.n;
+      c.slider.dispatchEvent(new Event("change"));
+      paintReadout(c, +c.slider.value);
+    }));
+
+  $(".enable", el).addEventListener("click", () => sendTicks(+c.slider.value));
+  $(".off", el).addEventListener("click", async () =>
+    updateCard(await post(`/api/servo/${s.name}/off`)));
+  $(".unlockbox", el).addEventListener("change", async (e) =>
+    updateCard(await post(`/api/servo/${s.name}/unlock`, { unlocked: e.target.checked })));
+  el.querySelectorAll(".goto").forEach(b =>
+    b.addEventListener("click", async () =>
+      updateCard(await post(`/api/servo/${s.name}/goto`, { target: b.dataset.t }))));
+  $(".zero", el).addEventListener("click", async () =>
+    updateCard(await post(`/api/servo/${s.name}/record`, { angle_deg: 0 })));
+  $(".rec", el).addEventListener("click", async () =>
+    updateCard(await post(`/api/servo/${s.name}/record`,
+                          { angle_deg: +$(".refang", el).value })));
+  $(".clear", el).addEventListener("click", async () =>
+    updateCard(await post(`/api/servo/${s.name}/clear_points`)));
+
+  CARDS[s.name] = c;
+  return el;
+}
+
+function paintReadout(c, ticks) {
+  $(".ticks", c.el).textContent = ticks + " ";
+  const us = ticks * 1e6 / (4096 * window.FREQ);
+  const leg = (ticks - window.PMIN) * 270 / (window.PMAX - window.PMIN);
+  $(".us", c.el).textContent = us.toFixed(1) + " µs";
+  $(".leg", c.el).textContent = leg.toFixed(1) + " legacy°";
+}
+
+function updateCard(s) {
+  const c = CARDS[s.name];
+  c.enabled = s.enabled;
+  c.el.classList.toggle("enabled", s.enabled);
+  c.el.classList.toggle("unlocked", s.unlocked);
+  c.slider.min = s.lo; c.slider.max = s.hi;
+  if (document.activeElement !== c.slider) c.slider.value = s.ticks;
+  $(".blo", c.el).textContent = s.lo + (s.unlocked ? " (elec)" : " (mech)");
+  $(".bhi", c.el).textContent = s.hi + (s.unlocked ? " (elec)" : " (mech)");
+  $(".unlockbox", c.el).checked = s.unlocked;
+  paintReadout(c, s.ticks);
+  const chips = $(".chips", c.el);
+  chips.innerHTML = s.points.map(p =>
+    `<span class="chip">${p.angle_deg}° → ${p.ticks}</span>`).join("");
+  const fitEl = $(".fit", c.el);
+  if (s.fit) {
+    fitEl.className = "fit";
+    fitEl.textContent = `zero ${s.fit.zero_ticks} ticks · slope ` +
+      `${s.fit.slope_ticks_per_deg} t/° (${s.fit.slope_us_per_deg} µs/°) · dir ` +
+      (s.fit.direction > 0 ? "+1" : "−1");
+    $(".gozero", c.el).disabled = false;
+  } else {
+    fitEl.className = "fit none";
+    fitEl.textContent = "no fit yet — record 2 points";
+    $(".gozero", c.el).disabled = true;
+  }
+}
+
+function render(state) {
+  window.FREQ = state.freq_hz; window.PMIN = state.pulse_min; window.PMAX = state.pulse_max;
+  const m = $("#mode");
+  m.textContent = state.mode === "hardware" ? "HARDWARE" : "SIMULATION";
+  m.className = "badge " + (state.mode === "hardware" ? "hw" : "sim");
+  $("#hwinfo").textContent =
+    `bus ${state.bus} · ${state.addr} · ${state.freq_hz} Hz · elec ${state.pulse_min}–${state.pulse_max} ticks`;
+  const main = $("#main");
+  main.innerHTML = ""; CARDS = {};
+  const byLeg = {};
+  state.servos.forEach(s => { (byLeg[s.name.split("_")[0]] ||= []).push(s); });
+  for (const leg of ["FL", "FR", "RL", "RR"]) {
+    const col = document.createElement("div");
+    col.className = "leg";
+    col.innerHTML = `<h2>${LEG_TITLES[leg]}</h2>`;
+    JOINT_ORDER.forEach(j => {
+      const s = byLeg[leg].find(x => x.name === `${leg}_${j}`);
+      col.appendChild(buildCard(s));
+    });
+    main.appendChild(col);
+    state.servos.filter(s => s.name.startsWith(leg)).forEach(updateCard);
+  }
+}
+
+async function load() {
+  const r = await fetch("/api/state");
+  render(await r.json());
+}
+
+$("#alloff").addEventListener("click", async () => {
+  const st = await post("/api/all_off");
+  st.servos.forEach(updateCard);
+  toast("All outputs OFF");
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("#alloff").click(); });
+
+for (const [btn, pose] of [["#poseStand", "stand"], ["#posePerp", "perp"]]) {
+  $(btn).addEventListener("click", async () => {
+    if (BUSY) return;
+    if (!confirm(`Move ALL 12 servos to the ${pose} pose?\nRobot must be on a stand.`)) return;
+    BUSY = true; toast(`Moving to ${pose} pose…`, 4000);
+    try { (await post("/api/pose", { pose })).servos.forEach(updateCard); }
+    finally { BUSY = false; }
+  });
+}
+
+$("#save").addEventListener("click", async () => {
+  const r = await post("/api/save");
+  r.state.servos.forEach(updateCard);
+  toast("Saved → " + r.saved);
+});
+$("#refresh").addEventListener("click", load);
+
+load();
+</script>
+</body>
+</html>
