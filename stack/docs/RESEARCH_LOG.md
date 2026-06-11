@@ -5,6 +5,43 @@ measurement, or decision that overrides prior practice. Newest first.
 
 ---
 
+## 2026-06-11 — D6: BARQ v1 URDF adopted (spotMicro stretched to the measured axle span)
+
+**Decision (Aryaman).** The CAD's 207.5 mm spans rear coxa shaft centre to
+front coxa shaft centre. The geometry difference vs spotMicro lives in the
+chassis section extended outward from the main components; spotMicro's URDF
+is trusted as the more precise source for everything else. Therefore: keep
+the spotMicro URDF wholesale and grow only the length so the axle span is
+**207.5 mm**.
+
+**Implementation** (`stack/urdf/barq_v1.urdf.xacro`, STLs vendored to
+`stack/urdf/stl/`): `shiftx` 0.093 → **0.10375**; `body_length` 0.140 →
+**0.1615** (center section carries the whole +21.5 mm). Unchanged stock:
+lateral `shifty` 0.039 (hip span 78), `shift` 0.055 (hip link), legs
+0.1075 / 0.130, shoulder 44 × 38, shell 110 × 70, covers 58 / 40. Visuals:
+mainbody mesh (spans both hip housings per STL bbox analysis) stretched
+×1.15357 in x — printed hip modules are stock, so the stretched visual
+housings sit ~3.5 mm off shaft centre, cosmetic only; cover meshes shifted
+outward ±10.75 mm. Upstream's swapped-sign front/rear collision boxes fixed
+(front +0.15475, rear −0.14575). Lidar backpack removed (no lidar on v1).
+Mesh paths via `$(arg mesh_prefix)` so the file works in pybullet (relative)
+and RViz (`file://` absolute).
+
+**Validation** (`stack/tools/validate_urdf.py`, standalone pip `xacro` in the
+workspace venv): 23 links / 22 joints; axle span 0.20750, hip span 0.07800,
+hip link 0.05500, upper 0.10750, lower 0.13000; four-way shoulder symmetry;
+all mesh refs resolve. Consistency: rendered cover-to-cover length from STL
+bounding boxes = **342.4 mm** vs 345.631 mm measured on the CAD (≤3 mm slop,
+same order as upstream's own box placement slop).
+
+**Kinematic truth for the IK layer**: `barq1/geometry.py` — body 0.2075 ×
+0.078, hip link 0.055, upper 0.1075, lower 0.130. Residual risk, accepted:
+CAD showed legs 113.92 / 134.76; per D6 these are treated as remodel
+artifacts of stock prints. A caliper check of one thigh (axis-to-axis,
+expect ~107.5) would retire the risk entirely.
+
+---
+
 ## 2026-06-11 — Revival kickoff: workspace, truths recovery, URDF confirmation, calibration GUI
 
 **Context.** v1 was a working-ish Python/I2C stack (Jetson Orin Nano → PCA9685

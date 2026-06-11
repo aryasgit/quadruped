@@ -1,0 +1,345 @@
+<?xml version="1.0"?>
+<!--
+  BARQ v1 robot description.
+
+  Derived from mike4192/spotMicro spot_micro_rviz/urdf/spot_micro.urdf.xacro
+  (MIT license). The BARQ v1 chassis is a spotMicro with the section BETWEEN
+  the coxa shafts stretched +21.5 mm to house the Jetson Orin Nano; legs and
+  shoulder modules are stock spotMicro prints. Decision D6, see
+  stack/docs/RESEARCH_LOG.md (2026-06-11).
+
+  Changes vs upstream:
+  - shiftx 0.093 -> 0.10375   (coxa shaft span 186 -> 207.5 mm, measured on
+    the BARQ CAD, rear shaft centre to front shaft centre)
+  - body_length 0.140 -> 0.1615 (center section carries the whole stretch)
+  - mainbody visual mesh stretched x1.15357 in x (the mesh spans both hip
+    housings; the printed hip modules are stock 44 mm, so the stretched
+    visual housings sit ~3.5 mm off shaft-center — cosmetic only)
+  - front/rear cover visuals shifted outward +/-10.75 mm with their shoulders
+  - front/rear collision boxes re-centered on the correct sides (upstream has
+    them on swapped x-signs) and aligned with the measured mesh extents
+  - RPLidar backpack removed (BARQ v1 has no lidar)
+  - mesh paths via $(arg mesh_prefix), default "stl" relative to this file;
+    for RViz pass mesh_prefix:=file:///<abs-path>/stack/urdf/stl
+
+  Rendered length check (from STL bounding boxes): covers span
+  -162.1..+180.3 mm = 342.4 mm overall, vs 345.631 mm measured on the BARQ
+  CAD. Lateral and vertical dims are untouched upstream values (hip-to-hip
+  78, shell height 70 — exact matches with the BARQ CAD).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="barq_v1">
+
+  <xacro:arg name="mesh_prefix" default="stl"/>
+  <xacro:property name="mesh" value="$(arg mesh_prefix)"/>
+
+  <material name="yellow">
+    <color rgba="0.92 0.83 0.0 1"/>
+  </material>
+  <material name="black">
+    <color rgba="0.1 0.1 0.1 1"/>
+  </material>
+  <material name="grey">
+    <color rgba="0.6 0.6 0.6 1"/>
+  </material>
+
+  <!-- Params -->
+
+  <!-- BARQ v1: stretched center (upstream 0.140); carries the +21.5 mm -->
+  <xacro:property name="body_length" value="0.1615" />
+  <xacro:property name="body_width" value="0.110" />
+  <xacro:property name="body_height" value="0.070" />
+
+  <xacro:property name="front_length" value="0.058" />
+  <xacro:property name="rear_length" value="0.040" />
+
+  <xacro:property name="shoulder_length" value="0.044" />
+  <xacro:property name="shoulder_width" value="0.038" />
+
+  <xacro:property name="leg_length" value="0.1075" />
+  <xacro:property name="foot_length" value="0.130" />
+
+  <xacro:property name="toe_radius" value="0.020" />
+  <xacro:property name="toe_width" value="0.020" />
+  <xacro:property name="shift" value="0.055" />
+  <!-- BARQ v1: coxa shaft at +/-103.75 mm (upstream 0.093) -> span 207.5 mm -->
+  <xacro:property name="shiftx" value="0.10375" />
+  <xacro:property name="shifty" value="0.039" />
+
+  <!-- mainbody visual stretch: 0.1615/0.140 = 1.153571 -->
+  <xacro:property name="body_stretch" value="1.153571" />
+
+  <!-- Macros -->
+
+  <xacro:macro name="gen_shoulder" params="name left">
+    <link name="${name}">
+      <visual>
+        <xacro:if value="${left}">
+        <geometry>
+          <mesh filename="${mesh}/lshoulder.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <origin rpy="0 0 3.14159" xyz="0.135 0.015 -0.01"/>
+        </xacro:if>
+        <xacro:unless value="${left}">
+        <geometry>
+          <mesh filename="${mesh}/rshoulder.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <origin rpy="0 0 3.14159" xyz="0.135 0.095 -0.01"/>
+        </xacro:unless>
+        <material name="black"/>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="${shoulder_length} ${shoulder_width} ${body_height}"/>
+        </geometry>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+      </collision>
+      <inertial>
+        <mass value="0.10"/>
+        <inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100" />
+      </inertial>
+    </link>
+  </xacro:macro>
+
+  <xacro:macro name="gen_shoulder_joint" params="pos shiftx shifty">
+    <joint name="${pos}_shoulder" type="revolute">
+      <parent link="base_link"/>
+      <child link="${pos}_shoulder_link"/>
+      <axis xyz="1 0 0"/>
+      <origin rpy="0 0 0" xyz="${shiftx} ${shifty} 0"/>
+      <limit effort="1000.0" lower="-0.548" upper="0.548" velocity="0.7"/>
+      <dynamics damping="0.0" friction="0.5"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="gen_leg" params="name left">
+    <link name="${name}_cover">
+      <visual>
+        <xacro:if value="${left}">
+        <geometry>
+          <mesh filename="${mesh}/larm_cover.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <origin rpy="0 -0.139 3.14159" xyz="0.130 -0.040 -0.025"/>
+        </xacro:if>
+        <xacro:unless value="${left}">
+        <geometry>
+          <mesh filename="${mesh}/rarm_cover.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <origin rpy="0 -0.139 3.14159" xyz="0.130 0.15 -0.025"/>
+        </xacro:unless>
+        <material name="yellow"/>
+      </visual>
+    </link>
+    <link name="${name}">
+      <visual>
+        <xacro:if value="${left}">
+        <geometry>
+          <mesh filename="${mesh}/larm.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <origin rpy="0 -0.139 3.14159" xyz="0.130 -0.040 -0.025"/>
+        </xacro:if>
+        <xacro:unless value="${left}">
+        <geometry>
+          <mesh filename="${mesh}/rarm.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <origin rpy="0 -0.139 3.14159" xyz="0.130 0.15 -0.025"/>
+        </xacro:unless>
+        <material name="black"/>
+      </visual>
+      <collision>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.050"/>
+        <geometry>
+          <box size="0.028 0.036 ${leg_length}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.15"/>
+        <inertia ixx="1000" ixy="0" ixz="0" iyy="1000" iyz="0" izz="1000" />
+      </inertial>
+    </link>
+  </xacro:macro>
+
+  <xacro:macro name="gen_leg_joint" params="pos shift">
+    <joint name="${pos}_leg" type="revolute">
+      <parent link="${pos}_shoulder_link"/>
+      <child link="${pos}_leg_link"/>
+      <axis xyz="0 1 0"/>
+      <origin rpy="0 0 0" xyz="0 ${shift} 0"/>
+      <limit effort="1000.0" lower="-2.666" upper="1.548" velocity="0.5"/>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <joint name="${pos}_leg_cover_joint" type="fixed">
+    <parent link="${pos}_leg_link"/>
+    <child link="${pos}_leg_link_cover"/>
+        <origin xyz="0 0 0"/>
+  </joint>
+  </xacro:macro>
+
+  <xacro:macro name="gen_foot" params="name left">
+    <link name="${name}">
+      <visual>
+        <xacro:if value="${left}">
+        <geometry>
+          <mesh filename="${mesh}/lfoot.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <origin rpy="0 0 3.14159" xyz="0.120 -0.04 0.1"/>
+        </xacro:if>
+        <xacro:unless value="${left}">
+        <geometry>
+          <mesh filename="${mesh}/rfoot.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <origin rpy="0 0 3.14159" xyz="0.120 0.15 0.1"/>
+        </xacro:unless>
+        <material name="black"/>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="0.026 0.020 ${foot_length}"/>
+        </geometry>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.050"/>
+      </collision>
+      <inertial>
+        <mass value="0.1"/>
+        <inertia ixx="1000" ixy="0" ixz="0" iyy="1000" iyz="0" izz="1000" />
+      </inertial>
+    </link>
+  </xacro:macro>
+
+  <xacro:macro name="gen_foot_joint" params="pos">
+    <joint name="${pos}_foot" type="revolute">
+      <parent link="${pos}_leg_link"/>
+      <child link="${pos}_foot_link"/>
+      <axis xyz="0 1 0"/>
+      <origin rpy="0 0 0" xyz="0 0 -${leg_length}"/>
+      <limit effort="1000.0" lower="-2.6" upper="0.1" velocity="0.5"/>
+      <dynamics damping="0.0" friction="0.5"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="gen_toe" params="name">
+    <link name="${name}">
+      <visual>
+        <geometry>
+        <mesh filename="${mesh}/foot.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <origin rpy="0 -0.40010 3.14159" xyz="0.00 0.01 0.015"/>
+        <material name="grey"/>
+      </visual>
+      <collision>
+        <geometry>
+          <sphere radius="${toe_radius}" />
+        </geometry>
+        <origin rpy="0 0 0" xyz="0 0 ${toe_radius}"/>
+        <contact_coefficients mu="1.1" />
+      </collision>
+      <inertial>
+        <mass value="0.05"/>
+        <inertia ixx="1000" ixy="0" ixz="0" iyy="1000" iyz="0" izz="1000" />
+      </inertial>
+    </link>
+  </xacro:macro>
+
+ <xacro:macro name="gen_toe_joint" params="pos">
+    <joint name="${pos}_toe" type="fixed">
+      <parent link="${pos}_foot_link"/>
+      <child link="${pos}_toe_link"/>
+      <origin xyz="0 0 -${foot_length}"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="gen_full_leg_joint" params="pos shiftx shifty shift left">
+    <xacro:gen_shoulder name="${pos}_shoulder_link" left="${left}"/>
+    <xacro:gen_leg name="${pos}_leg_link" left="${left}"/>
+    <xacro:gen_foot name="${pos}_foot_link" left="${left}"/>
+    <xacro:gen_toe name="${pos}_toe_link"/>
+
+    <xacro:gen_shoulder_joint pos="${pos}" shiftx="${shiftx}" shifty="${shifty}"/>
+    <xacro:gen_leg_joint pos="${pos}" shift="${shift}"/>
+    <xacro:gen_foot_joint pos="${pos}"/>
+    <xacro:gen_toe_joint pos="${pos}"/>
+  </xacro:macro>
+
+  <!-- Robot Body -->
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <!-- mainbody spans both hip housings; stretch only in x -->
+        <mesh filename="${mesh}/mainbody.stl"
+              scale="${0.001*body_stretch} 0.001 0.001"/>
+      </geometry>
+      <material name="black"/>
+      <origin rpy="0 0 0" xyz="${-0.042*body_stretch} -0.055 -0.010"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${body_length} ${body_width} ${body_height}"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="2.80"/>
+      <inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100" />
+    </inertial>
+  </link>
+
+  <link name="rear_link">
+    <visual>
+      <geometry>
+        <mesh filename="${mesh}/backpart.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <!-- upstream 0.04 shifted -0.01075 with the rear shoulder -->
+      <origin rpy="0 0 3.14159" xyz="0.02925 0.055 -0.010"/>
+      <material name="yellow"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${rear_length} ${body_width} ${body_height}"/>
+      </geometry>
+      <!-- rear of body: outboard of the rear shoulder module -->
+      <origin rpy="0 0 0" xyz="-0.14575 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.20"/>
+      <inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100" />
+    </inertial>
+  </link>
+  <joint name="base_rear" type="fixed">
+    <parent link="base_link"/>
+    <child link="rear_link"/>
+  </joint>
+
+  <link name="front_link">
+    <visual>
+      <geometry>
+        <mesh filename="${mesh}/frontpart.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <!-- upstream 0.040 shifted +0.01075 with the front shoulder -->
+      <origin rpy="0 0 3.14159" xyz="0.05075 0.055 -0.010"/>
+      <material name="yellow"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${front_length} ${body_width} ${body_height}"/>
+      </geometry>
+      <!-- front of body: outboard of the front shoulder module -->
+      <origin rpy="0 0 0" xyz="0.15475 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.20"/>
+      <inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100" />
+    </inertial>
+  </link>
+  <joint name="base_front" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_link"/>
+  </joint>
+
+  <!-- create Legs -->
+
+  <xacro:gen_full_leg_joint pos="front_left" shiftx="${shiftx}" shifty="${shifty}" shift="${shift}" left="true"/>
+  <xacro:gen_full_leg_joint pos="front_right" shiftx="${shiftx}" shifty="-${shifty}" shift="-${shift}" left="false"/>
+  <xacro:gen_full_leg_joint pos="rear_left" shiftx="-${shiftx}" shifty="${shifty}" shift="${shift}" left="true"/>
+  <xacro:gen_full_leg_joint pos="rear_right" shiftx="-${shiftx}" shifty="-${shifty}" shift="-${shift}" left="false"/>
+
+</robot>

@@ -23,15 +23,12 @@ _Last updated: 2026-06-11_
 
 ## Open questions for Aryaman
 
-- **Chassis is NOT dimensionally identical to the spotMicro URDF** (see
-  RESEARCH_LOG 2026-06-11): lateral 78 and height 70 match exactly, but CAD
-  says axle span 207.5 vs 186, overall 345.6 vs ≈327, legs 113.92/134.76 vs
-  107.5/130. Tape-measure on the real robot, joint-axis to joint-axis:
-  1. front coxa shaft → rear coxa shaft (CAD claims 207.5 — confirm endpoints)
-  2. thigh axis → knee axis (CAD 113.92)
-  3. knee axis → foot ground-contact center (CAD 134.76)
-  4. coxa axis → thigh axis lateral offset (URDF hip_link 55 — not in CAD shots)
-  Also: is the CAD the as-built robot, or a stylized remodel of it?
+- ~~Chassis vs URDF~~ → **resolved by D6** (RESEARCH_LOG 2026-06-11): URDF is
+  spotMicro stretched to the measured 207.5 mm axle span; legs/shoulders
+  stock. `stack/urdf/barq_v1.urdf.xacro` + `barq1/geometry.py` are now the
+  geometric truth. Residual (low priority): caliper one thigh axis-to-axis —
+  ~107.5 mm confirms stock prints; ~114 would mean custom legs and a 2-line
+  geometry fix.
 - Are all 12 servos still mounted per the legacy channel map (truths.py)?
 - DS3240MG variant: 270° assumed (legacy stack + measured range agree); any
   datasheet/spec sheet on hand to confirm pulse spec (commonly 500–2500 µs)?
