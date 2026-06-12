@@ -18,6 +18,9 @@ Thumbs.db
 *.tmp
 *.swp
 
+# Generated (xacro expansion for pybullet)
+*.generated.urdf
+
 # Virtual env (if any)
 venv/
 .env

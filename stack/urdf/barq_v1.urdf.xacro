@@ -70,6 +70,28 @@
 
   <!-- Macros -->
 
+  <!-- Sim-grade inertials (D-010): analytic box/sphere inertia about the
+       link COM (taken as the collision-shape center). Masses are upstream
+       guesses pending the Q-004 mass audit. -->
+  <xacro:macro name="box_inertial" params="m x y z ox:=0 oy:=0 oz:=0">
+    <inertial>
+      <origin rpy="0 0 0" xyz="${ox} ${oy} ${oz}"/>
+      <mass value="${m}"/>
+      <inertia ixx="${m/12.0*(y*y+z*z)}" ixy="0" ixz="0"
+               iyy="${m/12.0*(x*x+z*z)}" iyz="0"
+               izz="${m/12.0*(x*x+y*y)}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="sphere_inertial" params="m r ox:=0 oy:=0 oz:=0">
+    <inertial>
+      <origin rpy="0 0 0" xyz="${ox} ${oy} ${oz}"/>
+      <mass value="${m}"/>
+      <inertia ixx="${0.4*m*r*r}" ixy="0" ixz="0"
+               iyy="${0.4*m*r*r}" iyz="0" izz="${0.4*m*r*r}"/>
+    </inertial>
+  </xacro:macro>
+
   <xacro:macro name="gen_shoulder" params="name left">
     <link name="${name}">
       <visual>
@@ -93,10 +115,7 @@
         </geometry>
         <origin rpy="0 0 0" xyz="0 0 0"/>
       </collision>
-      <inertial>
-        <mass value="0.10"/>
-        <inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100" />
-      </inertial>
+      <xacro:box_inertial m="0.10" x="${shoulder_length}" y="${shoulder_width}" z="${body_height}"/>
     </link>
   </xacro:macro>
 
@@ -128,6 +147,7 @@
         </xacro:unless>
         <material name="yellow"/>
       </visual>
+      <xacro:box_inertial m="0.02" x="0.030" y="0.008" z="0.100" oz="-0.050"/>
     </link>
     <link name="${name}">
       <visual>
@@ -151,10 +171,7 @@
           <box size="0.028 0.036 ${leg_length}"/>
         </geometry>
       </collision>
-      <inertial>
-        <mass value="0.15"/>
-        <inertia ixx="1000" ixy="0" ixz="0" iyy="1000" iyz="0" izz="1000" />
-      </inertial>
+      <xacro:box_inertial m="0.15" x="0.028" y="0.036" z="${leg_length}" oz="-0.050"/>
     </link>
   </xacro:macro>
 
@@ -198,10 +215,7 @@
         </geometry>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.050"/>
       </collision>
-      <inertial>
-        <mass value="0.1"/>
-        <inertia ixx="1000" ixy="0" ixz="0" iyy="1000" iyz="0" izz="1000" />
-      </inertial>
+      <xacro:box_inertial m="0.1" x="0.026" y="0.020" z="${foot_length}" oz="-0.050"/>
     </link>
   </xacro:macro>
 
@@ -232,10 +246,7 @@
         <origin rpy="0 0 0" xyz="0 0 ${toe_radius}"/>
         <contact_coefficients mu="1.1" />
       </collision>
-      <inertial>
-        <mass value="0.05"/>
-        <inertia ixx="1000" ixy="0" ixz="0" iyy="1000" iyz="0" izz="1000" />
-      </inertial>
+      <xacro:sphere_inertial m="0.05" r="${toe_radius}" oz="${toe_radius}"/>
     </link>
   </xacro:macro>
 
@@ -277,10 +288,7 @@
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
-    <inertial>
-      <mass value="2.80"/>
-      <inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100" />
-    </inertial>
+    <xacro:box_inertial m="2.80" x="${body_length}" y="${body_width}" z="${body_height}"/>
   </link>
 
   <link name="rear_link">
@@ -299,10 +307,7 @@
       <!-- rear of body: outboard of the rear shoulder module -->
       <origin rpy="0 0 0" xyz="-0.14575 0 0"/>
     </collision>
-    <inertial>
-      <mass value="0.20"/>
-      <inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100" />
-    </inertial>
+    <xacro:box_inertial m="0.20" x="${rear_length}" y="${body_width}" z="${body_height}" ox="-0.14575"/>
   </link>
   <joint name="base_rear" type="fixed">
     <parent link="base_link"/>
@@ -325,10 +330,7 @@
       <!-- front of body: outboard of the front shoulder module -->
       <origin rpy="0 0 0" xyz="0.15475 0 0"/>
     </collision>
-    <inertial>
-      <mass value="0.20"/>
-      <inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100" />
-    </inertial>
+    <xacro:box_inertial m="0.20" x="${front_length}" y="${body_width}" z="${body_height}" ox="0.15475"/>
   </link>
   <joint name="base_front" type="fixed">
     <parent link="base_link"/>
