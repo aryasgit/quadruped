@@ -130,8 +130,9 @@ class SimRobot:
         """{leg: bool in contact with ground}."""
         out = {}
         for leg, link in self.toe_link.items():
+            # returns None (not p.error) if the GUI window closes mid-call
             pts = p.getContactPoints(bodyA=self.robot, bodyB=self.ground,
-                                     linkIndexA=link)
+                                     linkIndexA=link) or ()
             out[leg] = len(pts) > 0
         return out
 

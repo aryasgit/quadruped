@@ -77,7 +77,9 @@ def run_loop(names, args):
                 robot.step(2.0)  # hold between scenarios
     except KeyboardInterrupt:
         print("\nstopped.")
-    except p.error:
+    except (p.error, TypeError):
+        # closing the GUI window makes API calls raise p.error or return
+        # None mid-scenario (-> TypeError downstream); both mean "user's done"
         print("\nwindow closed — bye.")
     finally:
         try:
