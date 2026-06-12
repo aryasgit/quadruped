@@ -88,8 +88,10 @@
 <div class="warnbar">
   Robot on a stand, legs hanging free. Servos are <b>off</b> until you enable them —
   enabling snaps the servo to the slider value. Off = free-wheel (hand-position the link,
-  then enable near it). Method: mark <b>TRUE ZERO</b> at the link's 0° reference, then one
-  more point (±90° links 2–3, ±45° link 1) — per spotMicro servo_calibration.md.
+  then enable near it). Angles are the <b>URDF/IK convention</b> — zeros &amp; signs in
+  docs/06_CALIBRATION_PROTOCOL.md: coxa 0°=foot straight below hip, +45°=foot toward
+  robot's LEFT · thigh 0°=vertical, −90°=knee-forward horizontal · wrist 0°=leg straight,
+  −90°=shin folded forward. Mark <b>TRUE ZERO</b>, then Record @ the 2nd point.
 </div>
 <main id="main"></main>
 <div id="toast"></div>
@@ -154,7 +156,7 @@ function buildCard(s) {
       <div class="row">
         <button class="zero primary">Set TRUE ZERO here (0°)</button>
         <button class="rec">Record @</button>
-        <input type="number" class="refang" value="${s.name.includes("coxa") ? 45 : 90}" step="5">°
+        <input type="number" class="refang" value="${s.name.includes("coxa") ? 45 : -90}" step="5">°
         <button class="clear">Clear</button>
       </div>
       <div class="chips"></div>

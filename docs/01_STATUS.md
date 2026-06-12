@@ -4,12 +4,13 @@ _Last updated: 2026-06-12_
 
 ## Snapshot
 
-Stage B (geometry + virtual robot) **complete**: IK engine unit-tested
-(9/9), PyBullet sim running, and the virtual robot stands, poses, and lifts
-a leg open-loop (metrics in 05, 2026-06-12). Next is Stage C (gait in sim)
-and, in parallel, first hardware power-up + servo calibration. The physical
-robot has not been powered in this revival yet — servo board absent from the
-I2C scan, so everything hardware-side ran in sim mode.
+Stage C in sim is **done — the robot walks** (6-phase crawl: 3 cycles,
+0.59° heading drift, never statically unstable; 05, 2026-06-12). The full
+hardware pipeline is built and dry-run-verified end to end (calibration →
+servo map → slew-limited 50 Hz runtime → telemetry; 600 frames, 0
+overruns). PS4 teleop works in sim and is wired for hardware. **Everything
+now waits on hardware day**: reassembly, power-up, channel check, and the
+12-servo calibration per docs/06_CALIBRATION_PROTOCOL.md.
 
 ## Done
 
@@ -34,15 +35,20 @@ V=~/barq_v1/venv/bin/python
 cd ~/barq_v1/quadruped
 $V stack/tools/calibration_gui.py      # web GUI -> http://barq.local:8035
 $V stack/tools/validate_urdf.py        # URDF frame checks
-$V -m pytest stack/test -q             # kinematics unit tests
-$V stack/sim/run_sim.py --scenario stand_up        # headless sim + metrics
-DISPLAY=:0 $V stack/sim/run_sim.py --gui ...       # via VNC (fix_display.sh)
+$V -m pytest stack/test -q             # 15 unit tests (kinematics, servo map)
+$V stack/sim/run_sim.py                # all 5 scenarios headless + artifacts
+DISPLAY=:0 $V stack/sim/run_sim.py --loop          # demo window via VNC
+DISPLAY=:0 $V stack/sim/run_sim.py --teleop        # PS4 drives the sim
+$V stack/runtime/run_robot.py --dry-run --scenario walk   # hw pipeline, no hw
+$V stack/runtime/run_robot.py --scenario stand     # REAL ROBOT (on stand!)
 ```
 
-## Next
+## Next (hardware day — checklist in HANDOFF)
 
-1. Power the servo rail → `i2cdetect -y -r 7` should show 0x40 (+0x68) →
-   verify channel map (Q-001) → calibrate 12 true zeros → commit the YAML.
-2. Gait generator (spotMicro-style) in sim, with stability metrics.
-3. Servo-map layer: IK angles → calibrated ticks (needs the calibration YAML).
-4. IMU driver + posture loop (Stage D).
+1. Reassemble; document the power tree (Q-002: 4S tethered → BEC specs).
+2. Power → `i2cdetect -y -r 7` → channel check (Q-001) → calibrate 12
+   servos per docs/06_CALIBRATION_PROTOCOL.md → commit the YAML.
+3. On the stand: `run_robot --scenario stand` → `pose_sweep` →
+   `weight_shift` → `walk`; then ground. Then PS4 teleop.
+4. Masses from Q-004 → update xacro → re-run sim baselines.
+5. Stage D: IMU posture loop. Stage E: OAK-D Pro perception.

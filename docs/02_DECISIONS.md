@@ -5,6 +5,40 @@ decisions are superseded here and narrated in 05, never erased.
 
 ---
 
+## D-013 (2026-06-12) — Trajectory layer is the single motion source
+
+**Call:** `barq1/trajectories.py` + `barq1/gait.py` generate 50 Hz frame
+streams (feet, body_xyz, body_rpy); the sim executor and the hardware
+runner (`runtime/run_robot.py`) consume the IDENTICAL streams. One frame =
+one PCA9685 command. **Why:** sim-to-real is then a transport swap, not a
+reimplementation — what was validated is literally what is executed.
+
+## D-012 (2026-06-12) — Teleop = PS4 controller via evdev
+
+**Context:** Aryaman has a DualShock 4; spotMicro also used one.
+**Call:** evdev-based reader (`teleop/ps4.py`), one mapping module
+(`teleop/drive.py`) shared by sim (`run_sim --teleop`) and hardware
+(`run_robot --teleop`): sticks = body pose, TRIANGLE = crawl burst,
+SQUARE = ESTOP (hardware all-off), OPTIONS = quit. Needs `input` group
+membership. Web joystick deferred until needed. **Why:** zero new
+hardware, identical muscle memory in sim and on the robot.
+
+## D-011 (2026-06-12) — No middleware: the control stack stays pure Python
+
+**Context:** v1 historically ran with zero middleware; v2 (~/barq_ws) is
+ROS 2 in Docker; should the revival adopt ROS 2?
+**Call:** No. Single process, single board, single I2C bus, 50 Hz
+open-loop — a plain Python loop with typed JSONL telemetry. Escape
+hatches kept deliberately: ROS-conventional URDF/frames, trajectory-frame
+streams (D-013), and JSONL logs that a 50-line bridge node in the v2
+container could republish any day. Revisit trigger: when perception
+(OAK-D) becomes its own process — and then zmq/UDP first.
+**Why:** ROS solves multi-process/multi-machine plumbing we don't have;
+host install would violate workspace isolation and Docker adds the DDS
+/dev/shm class of failure for zero benefit. Note: spotMicro itself is ROS 1
+Kinetic (EOL) — "stick to the research" means their math, not middleware.
+v1 died of code quality, not missing middleware.
+
 ## D-010 (2026-06-12) — URDF inertials made physical
 
 **Context:** upstream spotMicro inertias are placeholders (ixx=100/1000

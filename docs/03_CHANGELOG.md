@@ -1,5 +1,22 @@
 # Changelog — newest first
 
+## 2026-06-12 — motion core + hardware bridge (D-011, D-012, D-013)
+
+- `barq1/trajectories.py` + `barq1/gait.py`: 50 Hz frame generators
+  (stance ramp, pose sweep, weight-shift, 6-phase crawl); scenarios
+  re-expressed on them; new `walk` scenario — **first sim walk passed**
+  (90.9 mm / 3 cycles, 0.59° heading drift, never unstable; see 05).
+- `barq1/servo_map.py` (+6 tests): IK rad → calibrated ticks, signed
+  slope, mech-window clamps. `docs/06_CALIBRATION_PROTOCOL.md` defines the
+  angle convention; GUI defaults/help updated to match.
+- `barq1/imu.py`: MPU6050 driver, bias calibration, complementary filter.
+- `runtime/`: `robot_io.py` (staggered engage, slew-limited apply,
+  all-off) + `run_robot.py` (sim's twin: same frames, 50 Hz wall-clock,
+  ESTOP, JSONL telemetry; `--dry-run` verified: 600 frames, 0 overruns).
+- `teleop/`: PS4 via evdev + shared mapping; `run_sim --teleop` and
+  `run_robot --teleop` (sticks = pose, TRIANGLE = crawl, SQUARE = ESTOP).
+- requirements: +evdev.
+
 ## 2026-06-12 — PyBullet simulation harness (D-008, D-009)
 
 - `stack/sim/`: `world.py` (xacro→URDF expansion, world setup, joint maps,

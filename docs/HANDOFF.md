@@ -28,17 +28,32 @@ _Keep the frontier fresh. Last updated: 2026-06-12_
 - SSH-over-443 push to `aryasgit/quadruped` works; branch `Master` tracks
   origin.
 
-## Current frontier
+## Current frontier — HARDWARE DAY (everything else is ready and waiting)
 
-- **Hardware**: robot not yet powered this revival. First power-up:
-  `i2cdetect -y -r 7` → calibration GUI → Q-001 channel check → 12 true
-  zeros → commit `stack/config/servo_calibration.yaml`.
-- **Sim**: Stage B done — IK (9/9 tests) + PyBullet scenarios all pass; the
-  open-loop leg lift works (05, 2026-06-12). Next: **crawl gait generator**
-  in sim (spotMicro 8-phase as the template), then the servo-map layer
-  (IK angles → calibrated ticks) once the calibration YAML exists.
-- Open questions: Q-001 channel map, Q-002 servo datasheet, Q-003 leg-link
-  caliper check, Q-004 mass audit.
+The sim walks (05, 2026-06-12) and the hardware pipeline is dry-run-clean.
+Robot is being reassembled. The day-one sequence, in order:
+
+1. **While reassembling**: record the power tree (Q-002 — 4S 6200 tethered
+   → which BEC/regulator, output V/A; DS3240MG voltage spec) and part
+   masses (Q-004).
+2. Power logic+rail → `i2cdetect -y -r 7` → expect `0x40` (+ `0x68`).
+3. Calibration GUI → one-card-at-a-time channel sanity (Q-001).
+4. Calibrate all 12 per **docs/06_CALIBRATION_PROTOCOL.md** → Save →
+   sanity gates (slope band, `python stack/barq1/servo_map.py`) →
+   **commit the YAML**.
+5. `run_robot.py --dry-run --scenario walk` (pipeline against the file),
+   then ON THE STAND: `--scenario stand` → `pose_sweep` → `weight_shift`
+   → `walk --cycles 1`. Telemetry lands in `~/barq_v1/artifacts/`.
+6. Ground. Then `--teleop` (PS4).
+
+PS4 one-time setup (needs Aryaman):
+- `sudo usermod -aG input barq` then log out/in (evdev read permission).
+- Bluetooth: hold SHARE+PS until the bar double-flashes →
+  `bluetoothctl` → `scan on` → `pair <MAC>` → `trust <MAC>` →
+  `connect <MAC>` ("Wireless Controller"). USB cable works with zero setup.
+
+Open questions: Q-001 channels, Q-002 datasheet+power tree, Q-003 leg-link
+caliper, Q-004 masses (incoming), Q-005 INA260 when it arrives.
 
 ## How to run things
 

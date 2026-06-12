@@ -88,12 +88,52 @@ def run_loop(names, args):
             pass
 
 
+def run_teleop(args):
+    """PS4 controller drives the simulated robot (pose + walk bursts)."""
+    from barq1.kinematics import body_ik, to_urdf_joints
+    from sim.scenarios import _spawn_standing
+    from teleop.drive import teleop_loop
+    from teleop.ps4 import PS4, NoController
+
+    try:
+        pad = PS4()
+    except NoController as e:
+        print(f"[teleop] {e}")
+        return
+
+    robot = SimRobot(gui=True)
+    _spawn_standing(robot)
+
+    def command(feet, xyz, rpy):
+        robot.command(to_urdf_joints(body_ik(feet, body_xyz=xyz, body_rpy=rpy)))
+
+    def reset():
+        print("[teleop] reset")
+        robot.reset()
+        _spawn_standing(robot)
+
+    try:
+        teleop_loop(pad, command, lambda: robot.step(1 / 50), estop=reset,
+                    walk_cycles=args.cycles)
+    except p.error:
+        print("window closed — bye.")
+    finally:
+        try:
+            p.disconnect(robot.client)
+        except p.error:
+            pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenario", default="all", choices=["all", *SCENARIOS])
     ap.add_argument("--gui", action="store_true", help="PyBullet GUI (use via VNC)")
     ap.add_argument("--loop", action="store_true",
                     help="single window, cycle scenarios until closed (implies --gui)")
+    ap.add_argument("--teleop", action="store_true",
+                    help="PS4 controller drives the sim (implies --gui)")
+    ap.add_argument("--cycles", type=int, default=2,
+                    help="walk cycles (teleop TRIANGLE / walk scenario)")
     ap.add_argument("--fast", action="store_true",
                     help="disable realtime pacing in GUI mode")
     ap.add_argument("--realtime", action="store_true",
@@ -101,10 +141,13 @@ def main():
     ap.add_argument("--no-artifacts", action="store_true")
     args = ap.parse_args()
 
-    if args.loop:
+    if args.loop or args.teleop:
         args.gui = True
         args.no_artifacts = True
 
+    if args.teleop:
+        run_teleop(args)
+        return
     names = list(SCENARIOS) if args.scenario == "all" else [args.scenario]
     if args.loop:
         run_loop(names, args)

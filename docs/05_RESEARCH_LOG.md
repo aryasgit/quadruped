@@ -7,6 +7,59 @@ D-007; decision refs renumbered D-001…D-006.)
 
 ---
 
+## 2026-06-12 — IT WALKS (in sim): 6-phase crawl, and the full hardware pipeline dry-run
+
+**Built** (while the robot is disassembled): trajectory layer (D-013),
+crawl gait, servo map, IMU driver, hardware runtime, PS4 teleop — the
+complete sim→hardware pipeline, every part testable without the robot.
+
+**Crawl gait** (`barq1/gait.py`): 6-phase static creep on the proven
+weight-shift primitive — shift right (+advance) | swing RL | swing FL |
+shift left (+advance) | swing RR | swing FR. Params: step 40 mm,
+clearance 35 mm, shift ±35 mm lateral / −30 mm aft, 0.9 s shifts,
+0.7 s swings → 4.6 s/cycle. Open-loop, zero feedback consumed.
+
+**Walk results** (3 cycles, headless, deterministic across runs;
+artifacts sim-20260612-173430):
+
+| metric | value |
+|---|---|
+| fell | **no** (max tilt 1.56°) |
+| distance | 90.9 mm of 120 commanded → **75.8 % open-loop efficiency** |
+| lateral drift / heading drift | 2.75 mm / **0.59°** over 13.8 s |
+| min support margin | **12.8 mm** (always statically stable) |
+| avg speed | 6.6 mm/s |
+
+Findings: the 24 % stride loss is toe scrub + servo lag during swings —
+the open-loop tax; levers are slower swings, stiffer position gain, and
+stride calibration on hardware. Heading hold of half a degree over three
+cycles open-loop is better than expected.
+
+**Re-baseline note:** scenarios re-expressed on the 50 Hz trajectory layer.
+pose_sweep tracking RMS is now 0.31/0.15/0.11° (was 3.08/2.43/5.30 at the
+old 30 Hz cadence — mostly a sampling artifact of the old executor, plus
+genuinely smaller per-frame steps at 50 Hz). All other metrics match the
+2026-06-12 baselines (margins 94.0/33.5 mm, tilt 0.04°).
+
+**Hardware pipeline dry-run** (`runtime/run_robot.py --dry-run`, synthetic
+calibration, simulated I2C bus): engage(staggered) → ramp → 1 walk cycle →
+ramp down → all-off; **600 frames @ 50 Hz, 0 overruns**, 12 joints/frame,
+JSONL telemetry written. The Orin holds the loop rate trivially.
+
+**Servo map** (`barq1/servo_map.py`, 6 new unit tests, 15/15 total):
+ticks = zero + signed_slope·deg, clamped to measured mech windows; sanity
+gates on slope band and zero placement. The calibration GUI's angle
+convention is now formally specified in docs/06_CALIBRATION_PROTOCOL.md —
+the legacy conventions.py sign tables are fully superseded.
+
+**Decisions:** D-011 (no middleware — pure Python, escape hatches kept),
+D-012 (PS4 teleop via evdev, shared sim/hw mapping), D-013 (trajectory
+layer as single motion source). New facts: 4S 6200 mAh battery, tethered
+(Q-002 power-tree documentation required before power-up); masses being
+weighed (Q-004); INA260 ordered, integration planned (Q-005).
+
+---
+
 ## 2026-06-12 — First simulation results: the robot stands, poses, and lifts a leg open-loop
 
 **What was built.** `barq1/kinematics.py` (analytic 3-DOF leg IK, knee-back
