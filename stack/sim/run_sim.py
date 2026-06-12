@@ -2,13 +2,18 @@
 """
 BARQ v1 simulation runner (D-008).
 
-    ~/barq_v1/venv/bin/python stack/sim/run_sim.py                 # all scenarios
+    ~/barq_v1/venv/bin/python stack/sim/run_sim.py                 # all, headless, fast
     ~/barq_v1/venv/bin/python stack/sim/run_sim.py --scenario pose_sweep
-    DISPLAY=:0 ... run_sim.py --gui --realtime --scenario settle   # watch via VNC
+    DISPLAY=:0 ... run_sim.py --gui --loop          # ONE window, cycles forever
+    DISPLAY=:0 ... run_sim.py --gui --scenario settle   # one pass, holds 4 s
 
-Headless by default (DIRECT + software renderer). Writes per-scenario CSV
-time series + PPM snapshots to ~/barq_v1/artifacts/sim-<stamp>/ (outside
-the repo, per docs policy).
+GUI mode paces at realtime automatically (--fast to disable) and keeps the
+window briefly after each scenario; --loop keeps a single window open and
+cycles the scenarios until you close the window or Ctrl-C.
+
+Headless (default) runs at full speed and writes per-scenario CSV time
+series + PPM snapshots to ~/barq_v1/artifacts/sim-<stamp>/ (outside the
+repo, per docs policy).
 """
 
 import argparse
@@ -19,46 +24,90 @@ from pathlib import Path
 STACK_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(STACK_ROOT))
 
+import pybullet as p
+
 from sim.scenarios import SCENARIOS
 from sim.world import SimRobot, save_snapshot
 
+
 ARTIFACTS = Path.home() / "barq_v1" / "artifacts"
+
+
+def _print_metrics(name, metrics):
+    print(f"\n=== {name} ===")
+    for k, v in metrics.items():
+        print(f"  {k:28} {v:.2f}" if isinstance(v, float) else f"  {k:28} {v}")
+
+
+def run_once(names, args):
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    outdir = ARTIFACTS / f"sim-{stamp}"
+    if not args.no_artifacts:
+        outdir.mkdir(parents=True, exist_ok=True)
+
+    for name in names:
+        robot = SimRobot(gui=args.gui, realtime=False if args.fast else None)
+        try:
+            metrics, rec = SCENARIOS[name](robot)
+            _print_metrics(name, metrics)
+            if not args.no_artifacts:
+                rec.save_csv(outdir / f"{name}.csv")
+                save_snapshot(str(outdir / f"{name}.ppm"))
+            if args.gui:
+                robot.step(4.0)  # hold the final pose so the eye can catch up
+        finally:
+            p.disconnect(robot.client)
+
+    if not args.no_artifacts:
+        print(f"\nartifacts -> {outdir}")
+
+
+def run_loop(names, args):
+    """One persistent window; cycle scenarios until the window is closed."""
+    robot = SimRobot(gui=args.gui, realtime=False if args.fast else None)
+    lap = 0
+    try:
+        while True:
+            lap += 1
+            print(f"\n--- demo lap {lap} (close the window or Ctrl-C to stop) ---")
+            for name in names:
+                robot.reset()
+                metrics, _ = SCENARIOS[name](robot)
+                _print_metrics(name, metrics)
+                robot.step(2.0)  # hold between scenarios
+    except KeyboardInterrupt:
+        print("\nstopped.")
+    except p.error:
+        print("\nwindow closed — bye.")
+    finally:
+        try:
+            p.disconnect(robot.client)
+        except p.error:
+            pass
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenario", default="all", choices=["all", *SCENARIOS])
     ap.add_argument("--gui", action="store_true", help="PyBullet GUI (use via VNC)")
-    ap.add_argument("--realtime", action="store_true")
+    ap.add_argument("--loop", action="store_true",
+                    help="single window, cycle scenarios until closed (implies --gui)")
+    ap.add_argument("--fast", action="store_true",
+                    help="disable realtime pacing in GUI mode")
+    ap.add_argument("--realtime", action="store_true",
+                    help=argparse.SUPPRESS)  # legacy no-op: GUI is realtime by default
     ap.add_argument("--no-artifacts", action="store_true")
     args = ap.parse_args()
 
+    if args.loop:
+        args.gui = True
+        args.no_artifacts = True
+
     names = list(SCENARIOS) if args.scenario == "all" else [args.scenario]
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    outdir = ARTIFACTS / f"sim-{stamp}"
-    if not args.no_artifacts:
-        outdir.mkdir(parents=True, exist_ok=True)
-
-    results = {}
-    for name in names:
-        robot = SimRobot(gui=args.gui)
-        try:
-            metrics, rec = SCENARIOS[name](robot)
-            results[name] = metrics
-            if not args.no_artifacts:
-                rec.save_csv(outdir / f"{name}.csv")
-                save_snapshot(str(outdir / f"{name}.ppm"))
-        finally:
-            import pybullet as p
-            p.disconnect(robot.client)
-
-        print(f"\n=== {name} ===")
-        for k, v in metrics.items():
-            print(f"  {k:28} {v:.2f}" if isinstance(v, float) else f"  {k:28} {v}")
-
-    if not args.no_artifacts:
-        print(f"\nartifacts -> {outdir}")
-    return results
+    if args.loop:
+        run_loop(names, args)
+    else:
+        run_once(names, args)
 
 
 if __name__ == "__main__":

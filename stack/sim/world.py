@@ -52,7 +52,10 @@ def _expand_urdf():
 class SimRobot:
     """The BARQ v1 robot in a PyBullet world, driven open-loop."""
 
-    def __init__(self, gui=False, start_height=0.18):
+    def __init__(self, gui=False, start_height=0.18, realtime=None):
+        # GUI defaults to realtime pacing — warp-speed GUI is unwatchable
+        self.realtime = gui if realtime is None else realtime
+        self.start_height = start_height
         self.client = p.connect(p.GUI if gui else p.DIRECT)
         p.setGravity(0, 0, -9.81)
         p.setTimeStep(TIME_STEP)
@@ -99,13 +102,22 @@ class SimRobot:
         for name, target in urdf_joint_targets.items():
             p.resetJointState(self.robot, self.joint_index[name], target)
 
-    def step(self, seconds, realtime=False):
+    def step(self, seconds, realtime=None):
+        rt = self.realtime if realtime is None else realtime
         n = max(1, int(round(seconds / TIME_STEP)))
         for _ in range(n):
             p.stepSimulation()
             self.t += TIME_STEP
-            if realtime:
+            if rt:
                 time.sleep(TIME_STEP)
+
+    def reset(self):
+        """Re-rack the robot for another scenario in the same world: base
+        back over the origin, velocities zeroed (scenarios teleport the
+        joints themselves)."""
+        p.resetBasePositionAndOrientation(self.robot, (0, 0, self.start_height),
+                                          (0, 0, 0, 1))
+        p.resetBaseVelocity(self.robot, (0, 0, 0), (0, 0, 0))
 
     # -- ground-truth probes (metrics only, never control: D-009) ------------
 

@@ -8,6 +8,10 @@
   caps), `scenarios.py` (settle, stand_up, pose_sweep, weight_shift),
   `run_sim.py` (CLI; CSV + snapshot artifacts to `~/barq_v1/artifacts/`).
 - All four scenarios pass headless; metrics in 05 (2026-06-12 entry).
+- Viewing fix: GUI mode now paces realtime by default (the flag was
+  previously unwired), holds the final pose 4 s, and `--loop` cycles all
+  scenarios in ONE persistent window until it's closed (windows no longer
+  blink open/shut per scenario).
 
 ## 2026-06-12 — IK engine + sim-grade URDF inertials (D-010)
 
