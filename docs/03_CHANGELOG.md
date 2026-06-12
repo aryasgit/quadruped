@@ -1,5 +1,25 @@
 # Changelog — newest first
 
+## 2026-06-12 — PyBullet simulation harness (D-008, D-009)
+
+- `stack/sim/`: `world.py` (xacro→URDF expansion, world setup, joint maps,
+  ground-truth probes: body state, contacts, COM, support-polygon margin),
+  `servo_model.py` (DS3240MG as position control with 3.0 N·m / 6.5 rad/s
+  caps), `scenarios.py` (settle, stand_up, pose_sweep, weight_shift),
+  `run_sim.py` (CLI; CSV + snapshot artifacts to `~/barq_v1/artifacts/`).
+- All four scenarios pass headless; metrics in 05 (2026-06-12 entry).
+
+## 2026-06-12 — IK engine + sim-grade URDF inertials (D-010)
+
+- `stack/barq1/kinematics.py`: analytic leg FK/IK (3-DOF, knee-backward
+  branch) + whole-body IK/FK + URDF joint mapping, mirroring the URDF frames
+  exactly. `stack/test/test_kinematics.py`: 9 tests (FK∘IK round-trip grid,
+  law-of-cosines cross-check, body-pose round-trip, limits envelope,
+  left/right mirror) — all passing.
+- URDF inertials replaced with analytic box/sphere values (D-010);
+  `validate_urdf.py` still passes. requirements: +xacro, numpy, pybullet,
+  pytest.
+
 ## 2026-06-12 — docs system adopted (D-007)
 
 - `docs/` created at repo root per the BARQ-Rebuild portable reference:

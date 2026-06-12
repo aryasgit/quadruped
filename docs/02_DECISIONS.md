@@ -5,6 +5,17 @@ decisions are superseded here and narrated in 05, never erased.
 
 ---
 
+## D-010 (2026-06-12) — URDF inertials made physical
+
+**Context:** upstream spotMicro inertias are placeholders (ixx=100/1000
+kg·m²) — fine for RViz, catastrophic for dynamics.
+**Call:** analytic box/sphere inertias about each link's collision-shape
+center via xacro macros; visual-only cover links got small real inertials.
+Masses stay upstream guesses until the Q-004 audit (total ~4.9 kg).
+**Why:** D-008 needs believable dynamics; analytic inertias from the
+collision boxes are within a factor ~2 of truth, versus 4–6 orders of
+magnitude off before.
+
 ## D-009 (2026-06-12) — Open-loop control doctrine
 
 **Context:** DS3240MG servos have no position/velocity/torque feedback; the

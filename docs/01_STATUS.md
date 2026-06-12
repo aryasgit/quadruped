@@ -4,11 +4,12 @@ _Last updated: 2026-06-12_
 
 ## Snapshot
 
-Stage B (geometry + virtual robot). Hardware layer and calibration tooling
-are built and smoke-tested; URDF is adopted and validated (D-006); IK engine
-and PyBullet simulation are landing today. The physical robot has not been
-powered in this revival yet — servo board absent from the I2C scan, so
-everything hardware-side ran in sim mode.
+Stage B (geometry + virtual robot) **complete**: IK engine unit-tested
+(9/9), PyBullet sim running, and the virtual robot stands, poses, and lifts
+a leg open-loop (metrics in 05, 2026-06-12). Next is Stage C (gait in sim)
+and, in parallel, first hardware power-up + servo calibration. The physical
+robot has not been powered in this revival yet — servo board absent from the
+I2C scan, so everything hardware-side ran in sim mode.
 
 ## Done
 
@@ -19,7 +20,11 @@ everything hardware-side ran in sim mode.
   channel map, mech windows, perp/stand), servo table, PCA9685 driver
   (safe start, free-wheel, sim bus).
 - Calibration web GUI (:8035), spotMicro two-point method, YAML output.
-- URDF `stack/urdf/barq_v1.urdf.xacro` (axle span 207.5) + validator.
+- URDF `stack/urdf/barq_v1.urdf.xacro` (axle span 207.5) + validator;
+  sim-grade inertials (D-010).
+- Kinematics: leg FK/IK + body IK (`barq1/kinematics.py`), 9/9 unit tests.
+- PyBullet sim (`stack/sim/`): settle / stand_up / pose_sweep / weight_shift
+  all passing headless; open-loop leg-lift proven (margin 33.5 mm).
 - Docs system (this) per D-007.
 
 ## How to run

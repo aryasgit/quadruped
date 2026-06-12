@@ -33,9 +33,10 @@ _Keep the frontier fresh. Last updated: 2026-06-12_
 - **Hardware**: robot not yet powered this revival. First power-up:
   `i2cdetect -y -r 7` → calibration GUI → Q-001 channel check → 12 true
   zeros → commit `stack/config/servo_calibration.yaml`.
-- **Sim**: IK engine + PyBullet harness landing 2026-06-12 (this session).
-  After that: gait generator in sim, then the servo-map layer (IK angles →
-  calibrated ticks) once the calibration YAML exists.
+- **Sim**: Stage B done — IK (9/9 tests) + PyBullet scenarios all pass; the
+  open-loop leg lift works (05, 2026-06-12). Next: **crawl gait generator**
+  in sim (spotMicro 8-phase as the template), then the servo-map layer
+  (IK angles → calibrated ticks) once the calibration YAML exists.
 - Open questions: Q-001 channel map, Q-002 servo datasheet, Q-003 leg-link
   caliper check, Q-004 mass audit.
 

@@ -7,6 +7,54 @@ D-007; decision refs renumbered D-001…D-006.)
 
 ---
 
+## 2026-06-12 — First simulation results: the robot stands, poses, and lifts a leg open-loop
+
+**What was built.** `barq1/kinematics.py` (analytic 3-DOF leg IK, knee-back
+branch, + whole-body IK — frames identical to the URDF by construction) and
+the PyBullet harness (`stack/sim/`), driving the robot exactly as hardware
+will be driven: position commands only, torque capped 3.0 N·m, velocity
+capped 6.5 rad/s (D-008/D-009). URDF upgraded to physical inertials first
+(D-010) — upstream placeholders were off by 4–6 orders of magnitude.
+
+**Kinematics verification** (`pytest stack/test -q`, 9/9):
+- FK∘IK round-trip < 1e-9 m over a 100+-point workspace grid, both sides.
+- IK cross-checked against an independent law-of-cosines derivation at
+  stand height: q2 = 0.97564 rad, q3 = −1.73004 rad — match < 1e-9.
+- Body-pose round-trip (IK→FK through body transforms) exact on translations
+  + rotations; operating envelope h ∈ 0.12–0.19 m with ±3 cm shifts stays
+  inside URDF joint limits. Boundary documented: a 0.10 m crouch + 4 cm
+  shift exceeds the 1.548 rad thigh limit (lie-down needs foot x-offsets,
+  as spotMicro's motion config also does).
+
+**Sim scenarios** (`run_sim.py`, headless, artifacts
+`~/barq_v1/artifacts/sim-20260612-153854/`):
+
+| scenario | result |
+|---|---|
+| settle (drop at stance) | stands: roll 0.01°, pitch −0.02°, 4 contacts, support margin **94.0 mm** = predicted stance-rectangle half-width (93.99 computed) |
+| stand_up (0.125→0.155 m ramp, 2 s) | max tilt **0.04°**, height err +5.4 mm |
+| pose_sweep (roll ±8.6°, pitch ±6.9°, yaw ±8.6°, h ±2 cm) | open-loop RMS tracking err: roll 3.08°, pitch 2.43°, yaw 5.30°; min margin 3.2 mm; toe scrub ≤ 13.5 mm |
+| weight_shift (shift → lift FL 4 cm → hold 1 s → return) | **survived**, min 3-leg margin 33.5 mm, max tilt 0.73° |
+
+**Findings.**
+1. The static-walk primitive (shift weight onto a tripod, lift the free leg)
+   works open-loop with a 33 mm COM margin — static/quasi-static gait is
+   viable on command-only servos. This is the green light for a crawl gait.
+2. Planted-foot yaw scrubs feet (13.5 mm) and eats nearly the whole support
+   margin at ±8.6° — posture control should keep yaw amplitudes small or
+   accept scrub. Roll/pitch posturing is cheap and safe.
+3. Constant +5.4 mm height bias at stand (contact/controller steady state) —
+   absorb into calibration later, not worth modeling.
+4. RMS pose-tracking error of 2.4–5.3° is the open-loop floor (servo lag
+   included); the IMU loop (Stage D) is what will close this on hardware.
+
+**Transfer caveats** (kept honest): masses are upstream guesses (Q-004), no
+gear backlash/deadband modeled yet, servo torque/speed from nameplate
+(Q-002). Visual check: `settle.png` in the artifacts dir — robot standing,
+level, correct knee direction.
+
+---
+
 ## 2026-06-11 — D-006: BARQ v1 URDF adopted (spotMicro stretched to the measured axle span)
 
 **Decision (Aryaman).** The CAD's 207.5 mm spans rear coxa shaft centre to
