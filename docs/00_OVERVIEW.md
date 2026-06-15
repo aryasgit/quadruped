@@ -7,10 +7,14 @@ feedback**), an HW-290 board provides the MPU6050 IMU. The chassis is a
 spotMicro stretched +21.5 mm between the coxa shafts to house the Jetson
 (D-006); legs and shoulder modules are stock spotMicro prints.
 
-Reference research: [mike4192/spotMicro](https://github.com/mike4192/spotMicro)
-(read-only clone at `~/barq_v1/reference/spotMicro`). The legacy v1 stack
-lives under `src/` — reference only; its measured constants were ported, its
-code is distrusted.
+Source of truth: [mike4192/spotMicro](https://github.com/mike4192/spotMicro)
+(read-only clone at `~/barq_v1/reference/spotMicro`) is the **complete design
+guide** for geometry, kinematics, gait, and control (D-014). The legacy v1
+stack under `src/` contributes ONLY five hardware-interface facts — I2C
+bus/addresses, the servo-driving method (PCA9685 PWM), PWM ranges (106–535),
+the mechanical limit windows, and the servo channel map (ported to
+`barq1/truths.py`). All other legacy code, and its perp/stand poses, are
+distrusted / superseded.
 
 ## Architecture (new stack, `stack/`)
 

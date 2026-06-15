@@ -5,6 +5,26 @@ decisions are superseded here and narrated in 05, never erased.
 
 ---
 
+## D-014 (2026-06-15) — spotMicro is the complete design guide; legacy scoped to hardware-interface facts only
+
+**Context (Aryaman):** BARQ v1 is a direct implementation of
+mike4192/spotMicro with upgraded components and slight dimensional changes.
+Verified the updated sim URDF is ~345 mm nose-to-tail (measured 342.5 mm
+visual / 349.5 mm collision; axle span 207.5 mm exact) vs stock spotMicro
+~321–327 mm — the 21.5 mm delta is exactly the D-006 stretch.
+**Call:** From the legacy in-house stack (`src/`) we take ONLY the
+hardware-interface facts: (1) I2C bus + device addresses, (2) the
+servo-driving method (PCA9685 PWM), (3) the PWM tick ranges (106–535),
+(4) the mechanical limit windows, (5) the servo channel map. Everything
+else — geometry, kinematics, gait, body control, calibration method,
+parameters — follows mike4192/spotMicro as the single source of truth.
+The legacy perp/stand pose values in `truths.py` are NOT authoritative
+going forward (superseded by phase-2 calibration); they survive only as
+GUI "go-to" convenience references and feed no active control path.
+**Why:** collapses D-001 (ticks), D-004 (calibration method), and D-006
+(URDF) into one unambiguous rule — spotMicro wins every design question
+except the five hardware facts that are physically ours.
+
 ## D-013 (2026-06-12) — Trajectory layer is the single motion source
 
 **Call:** `barq1/trajectories.py` + `barq1/gait.py` generate 50 Hz frame

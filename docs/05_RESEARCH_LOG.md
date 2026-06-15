@@ -7,6 +7,31 @@ D-007; decision refs renumbered D-001…D-006.)
 
 ---
 
+## 2026-06-15 — URDF length verification; spotMicro adopted as the complete guide (D-014)
+
+**URDF length confirmed** (`/tmp/measure_len.py`, two independent methods —
+own STL-bbox transform + Bullet AABB via the real sim load path; stock
+spotMicro measured the same way for comparison). Body shell, nose-to-tail:
+
+| measure | ours (updated sim URDF) | stock spotMicro |
+|---|---|---|
+| visual mesh extent (X) | **342.5 mm** | 321.0 mm |
+| collision extent (Bullet AABB) | **349.5 mm** | — |
+| coxa axle span (shaft→shaft) | **207.5 mm** (exact) | 186 mm |
+
+Ours − stock = **21.5 mm**, exactly the D-006 stretch. CAD physical length
+345.6 mm sits between our visual (342.5) and collision (349.5) extents; the
+~3 mm visual gap is cosmetic — the IK uses the exact 207.5 mm axle span.
+Confirms the running total length is **~345 mm, not the stock ~327 mm**.
+
+**Doctrine (D-014).** Legacy `src/` now contributes ONLY five
+hardware-interface facts (I2C bus/addresses, servo-driving method, PWM
+ranges 106–535, mechanical limit windows, servo channel map). spotMicro is
+the complete guide for everything else. Legacy perp/stand poses are
+superseded by phase-2 calibration and remain only as GUI references.
+
+---
+
 ## 2026-06-12 — IT WALKS (in sim): 6-phase crawl, and the full hardware pipeline dry-run
 
 **Built** (while the robot is disassembled): trajectory layer (D-013),
