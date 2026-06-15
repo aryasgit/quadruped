@@ -1,5 +1,17 @@
 # Changelog — newest first
 
+## 2026-06-15 — sim fidelity: hardware actuation boundary (D-015)
+
+- `sim/servo_model.py`: `JointActuator` — travel clamp + PCA9685 tick
+  quantization (0.629°/step) + 1-frame transport delay. `SimRobot.command()`
+  routes through it (default on); `world.py` builds per-joint actuators from
+  URDF limits and resets them on teleport. `run_sim.py --ideal` toggles it off.
+- Decomposition (05, 2026-06-15): quantization is the dominant effect, delay
+  negligible at quasi-static speed. Refuted the "servo-lag" stride-loss
+  hypothesis — it was planted-foot micro-slip; the tick deadband removes it
+  (walk efficiency 76 %→98 %). Cost: ±8.6° planted yaw now pushes COM ~3 mm
+  outside support (pose_sweep). Re-baselined; all 5 scenarios still pass.
+
 ## 2026-06-12 — motion core + hardware bridge (D-011, D-012, D-013)
 
 - `barq1/trajectories.py` + `barq1/gait.py`: 50 Hz frame generators

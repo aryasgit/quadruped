@@ -20,7 +20,7 @@ import pybullet as p
 import xacro
 
 from barq1.kinematics import URDF_LEG_NAME, LEGS
-from sim.servo_model import command_position
+from sim.servo_model import command_position, JointActuator
 
 XACRO_PATH = STACK_ROOT / "urdf" / "barq_v1.urdf.xacro"
 URDF_PATH = STACK_ROOT / "urdf" / "barq_v1.generated.urdf"  # gitignored
@@ -52,10 +52,14 @@ def _expand_urdf():
 class SimRobot:
     """The BARQ v1 robot in a PyBullet world, driven open-loop."""
 
-    def __init__(self, gui=False, start_height=0.18, realtime=None):
+    def __init__(self, gui=False, start_height=0.18, realtime=None,
+                 fidelity=True, cmd_delay_frames=1, quantize=True):
         # GUI defaults to realtime pacing — warp-speed GUI is unwatchable
         self.realtime = gui if realtime is None else realtime
         self.start_height = start_height
+        self.fidelity = fidelity
+        self._fid_delay = cmd_delay_frames
+        self._fid_quant = quantize
         self.client = p.connect(p.GUI if gui else p.DIRECT)
         p.setGravity(0, 0, -9.81)
         p.setTimeStep(TIME_STEP)
@@ -88,19 +92,37 @@ class SimRobot:
         assert len(self.joint_index) == 12, sorted(self.joint_index)
         assert len(self.toe_link) == 4
 
+        # Hardware actuation boundary (D-015): tick quantization + one-frame
+        # transport delay, clamped to each joint's URDF travel. fidelity=False
+        # restores the old ideal continuous-float path (for A/B comparison).
+        self.actuators = {}
+        if self.fidelity:
+            for name, idx in self.joint_index.items():
+                info = p.getJointInfo(self.robot, idx)
+                self.actuators[name] = JointActuator(
+                    info[8], info[9], self._fid_delay, self._fid_quant)
+
         self.t = 0.0
 
     # -- commanding (the only channel hardware has) --------------------------
 
     def command(self, urdf_joint_targets):
-        """{urdf_joint_name: angle_rad} — like writing PWM, nothing returned."""
+        """{urdf_joint_name: angle_rad} — like writing PWM, nothing returned.
+
+        With fidelity on, each target passes through the hardware actuation
+        boundary (tick quantization + one-frame transport delay + travel
+        clamp) so the sim drives exactly the angle a real servo could reach."""
         for name, target in urdf_joint_targets.items():
+            if self.fidelity:
+                target = self.actuators[name].command(target)
             command_position(p, self.robot, self.joint_index[name], target)
 
     def teleport_joints(self, urdf_joint_targets):
         """Set joint states instantly (spawn/reset only — not physical)."""
         for name, target in urdf_joint_targets.items():
             p.resetJointState(self.robot, self.joint_index[name], target)
+            if self.fidelity:
+                self.actuators[name].reset(target)
 
     def step(self, seconds, realtime=None):
         rt = self.realtime if realtime is None else realtime

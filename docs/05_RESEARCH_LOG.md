@@ -7,6 +7,61 @@ D-007; decision refs renumbered D-001…D-006.)
 
 ---
 
+## 2026-06-15 — Fidelity-first: the sim now actuates the hardware boundary (D-015)
+
+**Why:** the readiness audit found the sim fed continuous float radians to
+PyBullet, bypassing the PCA9685 tick grid + command latency that bind the
+real (feedback-less) robot — so sim success didn't guarantee a hardware-
+reachable angle. Highest-ROI de-risking step before more gait.
+
+**Built.** `JointActuator` (`sim/servo_model.py`): per-joint travel clamp +
+tick quantization (270° / 429 ticks = **0.629°/step**, from truths) +
+one-frame (20 ms) command transport delay, inserted in `SimRobot.command()`;
+`--ideal` toggles it off. 15/15 tests pass; all 5 scenarios run clean and
+**none fall** under the honest boundary.
+
+**Decomposition** (walk, 3 cycles; one variable at a time):
+
+| config | distance | efficiency | min margin |
+|---|---|---|---|
+| ideal (old float path) | 90.9 mm | 75.8 % | 12.8 mm |
+| delay-only (1–2 frames) | 91.0 mm | 75.8 % | 12.8 mm |
+| quantize-only | 118.0 mm | 98.3 % | 12.4 mm |
+| both (new default) | 117.7 mm | 98.1 % | 12.4 mm |
+
+**Findings.**
+1. **Quantization is the whole effect; transport delay is negligible at
+   quasi-static speed** (a uniform 20–40 ms delay just time-shifts a
+   quasi-static gait — no geometry change). Delay kept anyway: faithful, and
+   it will matter for the Stage-D IMU loop and any dynamic motion.
+2. **Refuted hypothesis (audit said "servo lag" caused the 24 % stride
+   loss — it does not).** The loss was **planted-foot micro-slip**: the
+   ideal sim issued sub-tick (<0.63°) per-frame nudges to STANCE feet that
+   PyBullet's contact let micro-slip, bleeding forward progress. The tick
+   grid is a **deadband** that zeroes those nudges → stance feet stay
+   planted → efficiency 76 % → ~98 %. The real servo has the same deadband,
+   so 76 % was a sim artifact. (How much of ~98 % survives real foot
+   friction is bounded in the robustness phase + hardware — not over-claimed
+   yet.)
+3. **Same deadband makes fine posturing coarse.** pose_sweep at ±8.6 °
+   planted-foot yaw: yaw-tracking RMS **0.11° → 1.18°**, min support margin
+   **3.2 mm → −3.2 mm** (COM transiently leaves the 4-foot polygon — held up
+   only because all four feet are down; a single tripod would tip).
+   Operational/teleop yaw posture must stay well under ±8.6° (teleop
+   `YAW_AMP` is currently 8.6° — flag for the gait-control phase).
+
+**New canonical baselines (fidelity ON; `--ideal` reproduces the old ones):**
+settle margin 94.0 mm, level; stand_up tilt 0.05°; pose_sweep RMS
+0.31/0.17/1.18° (r/p/y); weight_shift survived, 3-leg margin **22.4 mm**
+(was 33.5 ideal — coarser body-shift placement, still healthy); walk
+**117.7 mm / 98.1 % / margin 12.4 mm / no fall**.
+
+**Still pending (Q-002):** servo internal response-lag calibration
+(PyBullet positionGain/maxVelocity vs the real DS3240MG step response). The
+robustness sweep (next phase) will bound it; the datasheet will pin it.
+
+---
+
 ## 2026-06-15 — URDF length verification; spotMicro adopted as the complete guide (D-014)
 
 **URDF length confirmed** (`/tmp/measure_len.py`, two independent methods —

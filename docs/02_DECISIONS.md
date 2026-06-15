@@ -5,6 +5,24 @@ decisions are superseded here and narrated in 05, never erased.
 
 ---
 
+## D-015 (2026-06-15) — Sim models the hardware actuation boundary
+
+**Context:** the sim fed continuous float radians straight to PyBullet,
+bypassing what hardware physically imposes — PCA9685 tick resolution
+(0.629°/step) and command transport latency — so "passes in sim" did not
+mean "an angle the robot can actually hit" (readiness audit, 05 2026-06-15).
+No joint feedback exists to catch the difference (D-009).
+**Call:** `SimRobot` routes every joint command through a per-joint
+`JointActuator` (`sim/servo_model.py`): travel clamp + tick-grid
+quantization + one-frame (20 ms) transport delay. Default ON; `--ideal`
+(or `fidelity=False`) restores the old float path for A/B. The fidelity-ON
+numbers are now the canonical regression baseline.
+**Why:** mirrors the hardware path (`servo_map.ticks_for` + PCA9685) at the
+actuation boundary so sim validation is honest. Decomposition (05) shows it
+materially changes results in BOTH directions — worth doing before building
+more gait on top. (Servo internal response-lag calibration still pending
+Q-002 datasheet; robustness sweeps will bound it.)
+
 ## D-014 (2026-06-15) — spotMicro is the complete design guide; legacy scoped to hardware-interface facts only
 
 **Context (Aryaman):** BARQ v1 is a direct implementation of

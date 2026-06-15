@@ -1,16 +1,20 @@
 # Status
 
-_Last updated: 2026-06-12_
+_Last updated: 2026-06-15_
 
 ## Snapshot
 
-Stage C in sim is **done — the robot walks** (6-phase crawl: 3 cycles,
-0.59° heading drift, never statically unstable; 05, 2026-06-12). The full
-hardware pipeline is built and dry-run-verified end to end (calibration →
-servo map → slew-limited 50 Hz runtime → telemetry; 600 frames, 0
-overruns). PS4 teleop works in sim and is wired for hardware. **Everything
-now waits on hardware day**: reassembly, power-up, channel check, and the
-12-servo calibration per docs/06_CALIBRATION_PROTOCOL.md.
+Stage C in sim is **done — the robot walks**, and the sim now actuates the
+**hardware boundary** (PCA9685 tick quantization + transport delay, D-015),
+so its numbers are honest. Re-baselined fidelity-ON: crawl **117.7 mm / 3
+cycles, 98.1 % efficiency, never statically unstable**; the old 76 % was a
+sim artifact (planted-foot micro-slip the tick deadband removes — 05,
+2026-06-15). Full hardware pipeline built + dry-run-verified (calibration →
+servo map → slew-limited 50 Hz runtime → telemetry; 600 frames, 0 overruns).
+PS4 teleop works in sim. **Two tracks open:** (next) robustness sweeps +
+gait control/sequencing in sim; (parallel) hardware day — reassembly,
+power-up, channel check, 12-servo calibration per
+docs/06_CALIBRATION_PROTOCOL.md. Masses being weighed for the URDF (Q-004).
 
 ## Done
 

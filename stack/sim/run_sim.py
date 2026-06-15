@@ -46,7 +46,8 @@ def run_once(names, args):
         outdir.mkdir(parents=True, exist_ok=True)
 
     for name in names:
-        robot = SimRobot(gui=args.gui, realtime=False if args.fast else None)
+        robot = SimRobot(gui=args.gui, realtime=False if args.fast else None,
+                         fidelity=not args.ideal)
         try:
             metrics, rec = SCENARIOS[name](robot)
             _print_metrics(name, metrics)
@@ -64,7 +65,8 @@ def run_once(names, args):
 
 def run_loop(names, args):
     """One persistent window; cycle scenarios until the window is closed."""
-    robot = SimRobot(gui=args.gui, realtime=False if args.fast else None)
+    robot = SimRobot(gui=args.gui, realtime=False if args.fast else None,
+                     fidelity=not args.ideal)
     lap = 0
     try:
         while True:
@@ -101,7 +103,7 @@ def run_teleop(args):
         print(f"[teleop] {e}")
         return
 
-    robot = SimRobot(gui=True)
+    robot = SimRobot(gui=True, fidelity=not args.ideal)
     _spawn_standing(robot)
 
     def command(feet, xyz, rpy):
@@ -138,6 +140,9 @@ def main():
                     help="disable realtime pacing in GUI mode")
     ap.add_argument("--realtime", action="store_true",
                     help=argparse.SUPPRESS)  # legacy no-op: GUI is realtime by default
+    ap.add_argument("--ideal", action="store_true",
+                    help="disable the hardware actuation boundary (no tick "
+                         "quantization / transport delay) — ideal float path")
     ap.add_argument("--no-artifacts", action="store_true")
     args = ap.parse_args()
 
