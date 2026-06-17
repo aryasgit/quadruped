@@ -91,9 +91,9 @@ def run_loop(names, args):
 
 
 def run_teleop(args):
-    """PS4 controller drives the simulated robot (pose + walk bursts)."""
-    from barq1.kinematics import body_ik, to_urdf_joints
-    from sim.scenarios import _spawn_standing
+    """PS4 controller drives the simulated robot via the controller FSM."""
+    from barq1.controller import Controller
+    from barq1.kinematics import body_ik, stance_feet_world, to_urdf_joints
     from teleop.drive import teleop_loop
     from teleop.ps4 import PS4, NoController
 
@@ -104,19 +104,23 @@ def run_teleop(args):
         return
 
     robot = SimRobot(gui=True, fidelity=not args.ideal)
-    _spawn_standing(robot)
+    ctrl = Controller(dt=1 / 50, start_state="stand")
+    spawn = to_urdf_joints(body_ik(stance_feet_world(ctrl.stand_h),
+                                   body_xyz=(0, 0, ctrl.stand_h)))
+    robot.teleport_joints(spawn)
+    robot.command(spawn)
 
-    def command(feet, xyz, rpy):
+    def emit(cmd):
+        feet, xyz, rpy = ctrl.step(cmd)
         robot.command(to_urdf_joints(body_ik(feet, body_xyz=xyz, body_rpy=rpy)))
 
     def reset():
         print("[teleop] reset")
         robot.reset()
-        _spawn_standing(robot)
+        robot.teleport_joints(spawn)
 
     try:
-        teleop_loop(pad, command, lambda: robot.step(1 / 50), estop=reset,
-                    walk_cycles=args.cycles)
+        teleop_loop(pad, emit, lambda: robot.step(1 / 50), estop=reset)
     except p.error:
         print("window closed — bye.")
     finally:

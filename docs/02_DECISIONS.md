@@ -5,6 +5,23 @@ decisions are superseded here and narrated in 05, never erased.
 
 ---
 
+## D-017 (2026-06-15) — Controller FSM (idle / stand / walk)
+
+**Context:** the velocity gait (D-016), fixed crawl, and teleop had no
+unifying state machine — teleop was ad-hoc pose/walk modes, and the raw gait
+drifted at zero command. The legacy controller is hardcoded/gimmicky
+(Aryaman) and distrusted.
+**Call:** new `barq1/controller.py` — a clean FSM (idle/stand/walk) driven by
+`GaitCommand`, with rate-limited first-order transitions on body height and
+posture (`filters.py`) and feet easing to neutral when leaving walk. One
+`step(cmd)->frame` entry point that the sim (`run_sim --teleop`,
+`controller_demo` scenario), teleop (`drive.py`, rewritten to emit
+GaitCommands), and hardware (`run_robot --teleop`) all call. Standing/idle
+never cycle the legs (no idle drift); a walk request from idle stands up
+first, then walks.
+**Why:** completes the gait-control stack — one drivable brain shared
+sim↔hardware with smooth, safe transitions, replacing the legacy controller.
+
 ## D-016 (2026-06-15) — Velocity-commanded gait (spotMicro walk port)
 
 **Context:** our crawl (`gait.py`) was a fixed, pre-baked cycle — no

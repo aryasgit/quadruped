@@ -139,15 +139,18 @@ def main():
 
 
 def _teleop(args, io, telem, imu):
-    """Same mapping as the sim teleop; SQUARE = hardware ESTOP."""
+    """Controller-FSM teleop on hardware; SQUARE = ESTOP (all-off)."""
+    from barq1.controller import Controller
     from barq1.kinematics import body_ik
     from teleop.drive import teleop_loop
     from teleop.ps4 import PS4
 
     pad = PS4()
+    ctrl = Controller(dt=tj.DT, start_state="stand")
     state = {"next": time.monotonic(), "i": 0}
 
-    def command(feet, xyz, rpy):
+    def emit(cmd):
+        feet, xyz, rpy = ctrl.step(cmd)
         angles = io.apply(body_ik(feet, body_xyz=xyz, body_rpy=rpy))
         rp = gy = None
         if imu is not None:
@@ -163,8 +166,7 @@ def _teleop(args, io, telem, imu):
         else:
             state["next"] = time.monotonic()
 
-    teleop_loop(pad, command, step, estop=lambda: _panic(io, telem),
-                walk_cycles=args.cycles)
+    teleop_loop(pad, emit, step, estop=lambda: _panic(io, telem))
 
 
 def _panic(io, telem):

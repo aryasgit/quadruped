@@ -7,6 +7,35 @@ D-007; decision refs renumbered D-001…D-006.)
 
 ---
 
+## 2026-06-15 — Controller FSM completes the gait-control stack (D-017)
+
+**Built** `barq1/controller.py` — idle/stand/walk FSM driven by GaitCommand,
+rate-limited transitions on body height + posture (ported filter), feet ease
+to neutral on leaving walk. One `step(cmd)->frame` entry point; teleop
+(`drive.py`) rewritten to emit GaitCommands, and both `run_sim --teleop` and
+`run_robot --teleop` rewired to drive it.
+
+**Validation** (4 new unit tests + `controller_demo` scenario; 24/24 total):
+- Pure controller: idle lowers to IDLE_HEIGHT then stand raises back; **stand
+  pins feet at neutral with exactly zero body x/y drift** (the open-loop idle
+  drift is gone); a walk request from idle stands up *first*, then cycles;
+  full idle→stand→walk→stand→idle sequence stays IK-reachable and in-limit.
+- Sim `controller_demo` (fidelity-on): walks **118 mm**, sits to **0.11 m**,
+  rises to **0.16 m**, never fell.
+
+**Notes / minor polish (not blocking):** transition transients — ~6° tilt
+peak and ~35 mm forward coast when stopping from walk (physical
+deceleration, not cyclic drift) — could be softened with a gentler height
+rate / coordinated foot-recenter. Teleop yaw posture kept small (±0.06 rad)
+per the D-015 planted-yaw finding.
+
+**Stack status:** gait control is complete — truths → kinematics →
+velocity gait (D-016) + FSM (D-017) → one entry point feeding sim and the
+hardware runtime identically (D-013). Next: drive the real robot via a
+legacy-derived calibration (poses verified), or robustness sweeps.
+
+---
+
 ## 2026-06-15 — Real masses measured: robot is 1.76 kg, not 4.88 (Q-004 RESOLVED)
 
 **Measured** (Aryaman, per part, servos attached as-built — hip servo in the

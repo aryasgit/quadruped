@@ -19,9 +19,14 @@ crawl + full hardware pipeline (dry-run-clean, 0 overruns) + PS4 teleop all
 still in place. **Real masses measured & in the URDF: 1.76 kg** (was 4.88
 placeholder; Q-004 resolved) — re-baselined, gait stability *improved*.
 
-**Next:** controller FSM (idle/stand/walk + filter transitions) → wire
-teleop + run_robot to it → drive the real robot (legacy-derived calib) to
-judge performance. Then robustness sweeps once masses land.
+**Gait-control stack COMPLETE (D-017):** controller FSM (idle/stand/walk +
+rate-limited transitions), one `step(cmd)→frame` brain shared by sim, teleop,
+and run_robot. Validated in sim (walks/sits/rises, stable, zero stand drift;
+24/24 tests). Real masses in (1.76 kg, Q-004).
+
+**Next:** drive the real robot — legacy-derived calibration (poses verified)
++ velocity gait/FSM through run_robot, on the stand first — to judge
+performance. Then robustness sweeps + transition polish.
 
 ## Done
 

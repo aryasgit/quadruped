@@ -28,21 +28,24 @@ _Keep the frontier fresh. Last updated: 2026-06-12_
 - SSH-over-443 push to `aryasgit/quadruped` works; branch `Master` tracks
   origin.
 
-## Current frontier — gait control (D-016) → drive real robot
+## Current frontier — drive the real robot
 
-Hardware is connected + verified (channel map + stand/perp poses good via the
-diagnostic GUI). Velocity gait ported from spotMicro and validated in sim
-(forward/turn/strafe, statically stable). Immediate next:
-1. **Controller FSM** (`barq1/controller.py`, to build): idle/stand/walk +
-   transition states, smoothed by the ported RateLimitedFirstOrderFilter
-   (`barq1/filters.py`); one `step(cmd)->frame` entry point. Stand state =
-   hold stance (no leg cycling → no idle drift); walk state = VelocityGait.
-2. Wire teleop (`teleop/drive.py`) + `runtime/run_robot.py` to the FSM.
-3. Drive the real robot: derive a calibration from the legacy truths (perp =
-   joint-zero anchor + ±1.589 ticks/° slope, signs from inv-mount flags;
-   see roadmap phase-2 "Plan D") since stand/perp poses are confirmed good —
-   lets us move the robot now without the full 12-servo 2-point recal.
-4. Robustness sweeps once Aryaman's measured masses land (Q-004).
+Gait-control stack is **complete**: velocity gait (D-016) + controller FSM
+(D-017), one `step(cmd)->frame` brain shared by sim/teleop/run_robot, all
+validated in sim. Real masses in (1.76 kg, Q-004). Hardware connected +
+verified (channels + poses good). Immediate next:
+1. **Derive a calibration from the legacy truths** (Plan D, roadmap phase-2):
+   perp tick = joint-zero anchor, slope ±1.589 ticks/°, sign from each
+   servo's inv-mount flag → write `stack/config/servo_calibration.yaml`.
+   Stand/perp poses are confirmed correct, so this is good enough to drive
+   the robot without the full 12-servo 2-point recal.
+2. `run_robot.py --dry-run` against that file, then ON THE STAND:
+   `--scenario stand` → `walk`, then `--teleop` (PS4). Telemetry to
+   `~/barq_v1/artifacts/`.
+3. Judge performance; iterate gait params / transition polish.
+4. Robustness sweeps (now meaningful with real masses).
+
+Minor polish noted (05, D-017): walk-stop coast ~35 mm, transition tilt ~6°.
 
 ## (Superseded) HARDWARE DAY checklist
 

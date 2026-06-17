@@ -236,6 +236,48 @@ def vel_strafe(robot):
     return _vel_metrics(d), d["rec"]
 
 
+def controller_demo(robot):
+    """FSM (D-017): stand -> walk -> stand -> idle -> stand. Checks it walks,
+    holds still while standing (no idle drift), sits/rises smoothly, and stays
+    stable throughout."""
+    from barq1.controller import Controller, IDLE_HEIGHT
+
+    ctrl = Controller(dt=tj.DT, start_state="stand")
+    h = ctrl.stand_h
+    targets = to_urdf_joints(body_ik(stance_feet_world(h), body_xyz=(0, 0, h)))
+    robot.teleport_joints(targets)
+    robot.command(targets)
+    robot.step(0.5)
+    rec = Recorder()
+
+    def seg(cmd, secs):
+        x0, y0, _ = robot.body_state()[0]
+        for _ in range(int(round(secs / tj.DT))):
+            feet, xyz, rpy = ctrl.step(cmd)
+            robot.command(to_urdf_joints(body_ik(feet, body_xyz=xyz, body_rpy=rpy)))
+            robot.step(tj.DT)
+            rec.sample(robot, cmd_rpy=rpy)
+        (x1, y1, z1), _ = robot.body_state()
+        return x0, y0, x1, y1, z1
+
+    seg(GaitCommand(state="stand"), 1.5)
+    wx0, _, wx1, _, _ = seg(GaitCommand(state="walk", vx=0.024), 6.0)
+    sx0, sy0, sx1, sy1, _ = seg(GaitCommand(state="stand"), 2.0)   # drift check
+    *_, idle_z = seg(GaitCommand(state="idle"), 2.5)
+    *_, stand_z = seg(GaitCommand(state="stand"), 2.5)
+
+    margins = [m for m in rec.col("margin") if not math.isnan(m)]
+    return {
+        "walked_mm": (wx1 - wx0) * 1000,
+        "stand_drift_mm": math.hypot(sx1 - sx0, sy1 - sy0) * 1000,
+        "idle_height_m": round(idle_z, 3),
+        "stand_height_m": round(stand_z, 3),
+        "min_margin_mm": min(margins) * 1000,
+        "max_tilt_deg": math.degrees(_max_tilt(rec)),
+        "fell": min(rec.col("h")) < 0.06,
+    }, rec
+
+
 SCENARIOS = {
     "settle": settle,
     "stand_up": stand_up,
@@ -245,4 +287,5 @@ SCENARIOS = {
     "vel_forward": vel_forward,
     "vel_turn": vel_turn,
     "vel_strafe": vel_strafe,
+    "controller_demo": controller_demo,
 }

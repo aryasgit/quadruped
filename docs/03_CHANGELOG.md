@@ -1,5 +1,14 @@
 # Changelog — newest first
 
+## 2026-06-15 — controller FSM completes the gait stack (D-017)
+
+- `barq1/controller.py`: idle/stand/walk FSM, rate-limited height+posture
+  transitions, feet ease-to-neutral; one `step(cmd)->frame` entry point.
+- `teleop/drive.py` rewritten to emit GaitCommands; `run_sim --teleop` and
+  `run_robot --teleop` rewired to the FSM. New `controller_demo` sim scenario
+  + `test/test_controller.py` (4 tests). 24/24 pass.
+- Validated: stands/walks/sits/rises stable, no fall; stand holds zero drift.
+
 ## 2026-06-15 — real masses in the URDF (Q-004 resolved)
 
 - All 8 link masses set to Aryaman's measured values: total **1.76 kg**
