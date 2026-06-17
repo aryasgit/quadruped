@@ -52,8 +52,11 @@ def teleop_loop(pad, emit, step, estop=None, status=lambda m: print(m)):
             status("[teleop] quit")
             return
         if "square" in edges and estop:
+            # sim estop resets and keeps driving; hardware estop all-offs and
+            # exits the process itself — so DON'T return here (only OPTIONS or
+            # closing the window quits the session).
+            status("[teleop] ESTOP")
             estop()
-            return
         if "triangle" in edges:
             cmd.state = "walk"; status("[teleop] WALK")
         if "x" in edges:
