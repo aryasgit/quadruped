@@ -1,5 +1,17 @@
 # Changelog — newest first
 
+## 2026-06-15 — velocity-commanded gait (D-016)
+
+- `barq1/command.py` (GaitCommand), `barq1/filters.py`
+  (RateLimitedFirstOrderFilter, ported from spotMicro), `barq1/velocity_gait.py`
+  (VelocityGait) — spotMicro walk port: forward/turn/strafe from one engine,
+  8-phase static schedule + body weave. Fixed crawl (`gait.py`) untouched.
+- `sim/scenarios.py`: vel_forward / vel_turn / vel_strafe (+ in run_sim/--loop).
+  `test/test_velocity_gait.py` (5 tests). 20/20 pass.
+- Validated (05, 2026-06-15): all three directions statically stable, none
+  fell. Joint-safe speed envelope scanned and set as the clamps (vx 0.024,
+  vy 0.022 m/s, wz 0.10 rad/s); thigh upper limit is the binding constraint.
+
 ## 2026-06-15 — sim fidelity: hardware actuation boundary (D-015)
 
 - `sim/servo_model.py`: `JointActuator` — travel clamp + PCA9685 tick

@@ -4,17 +4,23 @@ _Last updated: 2026-06-15_
 
 ## Snapshot
 
-Stage C in sim is **done — the robot walks**, and the sim now actuates the
-**hardware boundary** (PCA9685 tick quantization + transport delay, D-015),
-so its numbers are honest. Re-baselined fidelity-ON: crawl **117.7 mm / 3
-cycles, 98.1 % efficiency, never statically unstable**; the old 76 % was a
-sim artifact (planted-foot micro-slip the tick deadband removes — 05,
-2026-06-15). Full hardware pipeline built + dry-run-verified (calibration →
-servo map → slew-limited 50 Hz runtime → telemetry; 600 frames, 0 overruns).
-PS4 teleop works in sim. **Two tracks open:** (next) robustness sweeps +
-gait control/sequencing in sim; (parallel) hardware day — reassembly,
-power-up, channel check, 12-servo calibration per
-docs/06_CALIBRATION_PROTOCOL.md. Masses being weighed for the URDF (Q-004).
+**Hardware is connected and verified** — first power-up done: I2C bus 7
+shows PCA9685 (0x40), MPU6050 (0x68), and bonus OLED (0x3c) + barometer
+(0x77); the diagnostic GUI confirmed the channel map and that the stand/perp
+poses produce correct physical poses (so a legacy-derived calibration is
+viable for hardware testing). The sim actuates the **hardware boundary**
+(D-015) so its numbers are honest.
+
+**Gait control underway (D-016):** velocity-commanded gait (spotMicro walk
+port) — forward / turn / strafe from one engine, all statically stable in
+sim (p10 margin ≥ 9 mm, tilt ≤ 2.6°, none fell). Joint-safe speed envelope
+vx 0.024 / vy 0.022 m/s / wz 0.10 rad/s (thigh upper limit binds). Fixed
+crawl + full hardware pipeline (dry-run-clean, 0 overruns) + PS4 teleop all
+still in place. Masses being weighed for the URDF (Q-004).
+
+**Next:** controller FSM (idle/stand/walk + filter transitions) → wire
+teleop + run_robot to it → drive the real robot (legacy-derived calib) to
+judge performance. Then robustness sweeps once masses land.
 
 ## Done
 

@@ -28,7 +28,23 @@ _Keep the frontier fresh. Last updated: 2026-06-12_
 - SSH-over-443 push to `aryasgit/quadruped` works; branch `Master` tracks
   origin.
 
-## Current frontier — HARDWARE DAY (everything else is ready and waiting)
+## Current frontier — gait control (D-016) → drive real robot
+
+Hardware is connected + verified (channel map + stand/perp poses good via the
+diagnostic GUI). Velocity gait ported from spotMicro and validated in sim
+(forward/turn/strafe, statically stable). Immediate next:
+1. **Controller FSM** (`barq1/controller.py`, to build): idle/stand/walk +
+   transition states, smoothed by the ported RateLimitedFirstOrderFilter
+   (`barq1/filters.py`); one `step(cmd)->frame` entry point. Stand state =
+   hold stance (no leg cycling → no idle drift); walk state = VelocityGait.
+2. Wire teleop (`teleop/drive.py`) + `runtime/run_robot.py` to the FSM.
+3. Drive the real robot: derive a calibration from the legacy truths (perp =
+   joint-zero anchor + ±1.589 ticks/° slope, signs from inv-mount flags;
+   see roadmap phase-2 "Plan D") since stand/perp poses are confirmed good —
+   lets us move the robot now without the full 12-servo 2-point recal.
+4. Robustness sweeps once Aryaman's measured masses land (Q-004).
+
+## (Superseded) HARDWARE DAY checklist
 
 The sim walks (05, 2026-06-12) and the hardware pipeline is dry-run-clean.
 Robot is being reassembled. The day-one sequence, in order:

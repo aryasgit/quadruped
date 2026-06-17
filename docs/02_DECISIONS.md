@@ -5,6 +5,24 @@ decisions are superseded here and narrated in 05, never erased.
 
 ---
 
+## D-016 (2026-06-15) — Velocity-commanded gait (spotMicro walk port)
+
+**Context:** our crawl (`gait.py`) was a fixed, pre-baked cycle — no
+turning, strafe, or velocity command (readiness audit, 05 2026-06-15).
+**Call:** new `barq1/velocity_gait.py` (VelocityGait) ports spotMicro's
+walk controller (spot_micro_walk.cpp, the D-014 source of truth) into our
+frame: 8-phase static schedule (one leg swings per odd phase, body weaves
+over the support tripod on even phases), a stance controller (planted feet
+sweep backward at the commanded velocity + yaw) and a swing controller
+(foot arcs to a velocity-scaled touchdown). Driven by `barq1/command.py`
+(GaitCommand: vx/vy/wz + posture + state), smoothed by `barq1/filters.py`
+(RateLimitedFirstOrderFilter, ported verbatim). The fixed crawl is kept
+intact. Joint-safe speed envelope (scanned): **vx 0.024, vy 0.022 m/s,
+wz 0.10 rad/s** — the clamps live there.
+**Why:** one velocity-parameterized engine for forward/turn/strafe — the
+prerequisite for teleop and the controller FSM. Validated in sim
+(05 2026-06-15): all three directions statically stable, none fell.
+
 ## D-015 (2026-06-15) — Sim models the hardware actuation boundary
 
 **Context:** the sim fed continuous float radians straight to PyBullet,

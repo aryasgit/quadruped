@@ -15,7 +15,9 @@ STACK_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(STACK_ROOT))
 
 from barq1 import gait, trajectories as tj
+from barq1.command import GaitCommand
 from barq1.kinematics import body_ik, stance_feet_world, to_urdf_joints
+from barq1.velocity_gait import VelocityGait
 
 STAND_H = tj.STAND_H
 CROUCH_H = tj.CROUCH_H
@@ -175,10 +177,72 @@ def walk(robot, cycles=3, params=gait.CrawlParams()):
     }, rec
 
 
+def _velocity_run(robot, cmd, secs, cfg=None):
+    """Drive the velocity gait (D-016) at a fixed command for `secs`."""
+    g = VelocityGait(cfg)
+    h = g.cfg.stand_height
+    targets = to_urdf_joints(body_ik(stance_feet_world(h), body_xyz=(0, 0, h)))
+    robot.teleport_joints(targets)
+    robot.command(targets)
+    robot.step(0.5)
+    (x0, y0, _), (_, _, yaw0) = robot.body_state()
+    g.reset()
+    rec = Recorder()
+
+    def frames():
+        for _ in range(int(round(secs / g.cfg.dt))):
+            yield g.step(cmd)
+
+    run_trajectory(robot, frames(), rec)
+    (x1, y1, z1), (_, _, yaw1) = robot.body_state()
+    margins = sorted(m for m in rec.col("margin") if not math.isnan(m))
+    return {
+        "x0": x0, "y0": y0, "yaw0": yaw0, "x1": x1, "y1": y1, "z1": z1,
+        "yaw1": yaw1, "margins": margins, "rec": rec,
+        "max_tilt_deg": math.degrees(_max_tilt(rec)),
+        "fell": z1 < 0.10 or math.degrees(_max_tilt(rec)) > 15,
+    }
+
+
+def _vel_metrics(d):
+    m = d["margins"]
+    return {
+        "fell": d["fell"],
+        "distance_x_mm": (d["x1"] - d["x0"]) * 1000,
+        "drift_y_mm": (d["y1"] - d["y0"]) * 1000,
+        "yaw_deg": math.degrees(d["yaw1"] - d["yaw0"]),
+        "median_margin_mm": m[len(m) // 2] * 1000,
+        "p10_margin_mm": m[len(m) // 10] * 1000,
+        "neg_margin_pct": 100.0 * sum(1 for v in m if v < 0) / len(m),
+        "max_tilt_deg": d["max_tilt_deg"],
+    }
+
+
+def vel_forward(robot):
+    """Velocity gait: walk forward at the safe-envelope max for 8 s."""
+    d = _velocity_run(robot, GaitCommand(vx=0.024), 8.0)
+    return _vel_metrics(d), d["rec"]
+
+
+def vel_turn(robot):
+    """Velocity gait: turn left in place at the safe-envelope max for 8 s."""
+    d = _velocity_run(robot, GaitCommand(wz=0.10), 8.0)
+    return _vel_metrics(d), d["rec"]
+
+
+def vel_strafe(robot):
+    """Velocity gait: strafe left at the safe-envelope max for 8 s."""
+    d = _velocity_run(robot, GaitCommand(vy=0.022), 8.0)
+    return _vel_metrics(d), d["rec"]
+
+
 SCENARIOS = {
     "settle": settle,
     "stand_up": stand_up,
     "pose_sweep": pose_sweep,
     "weight_shift": weight_shift,
     "walk": walk,
+    "vel_forward": vel_forward,
+    "vel_turn": vel_turn,
+    "vel_strafe": vel_strafe,
 }

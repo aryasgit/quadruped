@@ -7,6 +7,51 @@ D-007; decision refs renumbered D-001…D-006.)
 
 ---
 
+## 2026-06-15 — Gait control: velocity-commanded gait ported from spotMicro (D-016)
+
+**Why:** the diagnostic GUI confirmed the channel map + stand/perp poses on
+real hardware, so the next high-ROI step is gait control ("can only tell
+performance once it's moving"). Our crawl was fixed/pre-baked — no turn,
+strafe, or velocity command.
+
+**Built** (per the audit's Phase-2): `command.py` (GaitCommand), `filters.py`
+(RateLimitedFirstOrderFilter, ported verbatim from spotMicro), and
+`velocity_gait.py` (VelocityGait) — a faithful port of spotMicro's
+`spot_micro_walk.cpp` into our frame (x-fwd/y-left/z-up vs their
+x/y-up/z-left): 8-phase static schedule, stance controller (planted feet
+sweep back at cmd velocity + yaw), swing controller (triangular-height arc
+to a velocity-scaled touchdown), body weave to the support tripod. Fixed
+crawl (`gait.py`) left intact.
+
+**Validation** (sim, fidelity-on, 8 s; new scenarios + 5 unit tests, 20/20):
+
+| command | result | median margin | p10 | tilt |
+|---|---|---|---|---|
+| forward 0.024 m/s | +132 mm (drift −22 mm, yaw +0.3°) | 18 mm | 9 mm | 2.5° |
+| turn-left 0.10 rad/s | **+20.5° yaw** | 30 mm | 10 mm | 2.6° |
+| strafe-left 0.022 m/s | **+163 mm** (yaw +4°) | 30 mm | 10 mm | 2.4° |
+
+All statically stable (p10 ≥ 9 mm = 90% of frames), none fell. Yaw sign
+needed flipping after the axis remap; linear signs were correct first try.
+
+**Joint-safe envelope (finding).** Scanned the largest single-axis velocity
+keeping every joint inside its URDF limit (1.7° margin, both directions,
+full cycle): **vx 0.024, vy 0.022 m/s, wz 0.105 rad/s** — clamps set there.
+Binding constraint = the thigh's tight upper limit (1.548 rad); larger or
+backward strides drive it past, where sim (and the hardware mech-window)
+saturate it silently. Earlier ad-hoc vx=0.04 runs were over-driving into
+that saturation — the honest envelope is ~3–4× slower. Raising it needs a
+faster cadence or different stance height (future tuning).
+
+**Residual:** open-loop lateral coupling (forward drifts ~22 mm / 132 mm;
+turning translates slightly) — expected; the IMU/heading loop (Stage D)
+nulls it on hardware.
+
+**Next:** controller FSM (idle/stand/walk + transitions via the ported
+filter), then wire teleop + run_robot to it.
+
+---
+
 ## 2026-06-15 — Fidelity-first: the sim now actuates the hardware boundary (D-015)
 
 **Why:** the readiness audit found the sim fed continuous float radians to
