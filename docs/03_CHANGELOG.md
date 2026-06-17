@@ -1,5 +1,12 @@
 # Changelog — newest first
 
+## 2026-06-17 — FIRST hardware stand (real robot)
+
+- Stand-anchored legacy-derived calibration drove the real robot to a level
+  stand via run_robot --hold (IMU roll -0.1 / pitch -0.7 deg steady, 0
+  overruns). imu.py: cap dt <=0.05s (kills the first-frame gyro-integration
+  spike). Slope signs still unverified -> stand-only, not walking yet.
+
 ## 2026-06-17 — teleop: 4-quadrant proportional left stick
 
 - `teleop/drive.py`: left stick -> `stick_to_velocity()` dominant-axis

@@ -109,6 +109,8 @@ class IMU:
         now = time.monotonic()
         dt = 0.0 if self._t_last is None else now - self._t_last
         self._t_last = now
+        dt = min(dt, 0.05)   # cap: a long gap (e.g. after engage) must not
+                             # integrate gyro into a huge bogus angle spike
 
         roll_acc = math.atan2(ay, az if az != 0 else 1e-9)
         pitch_acc = math.atan2(-ax, math.hypot(ay, az) or 1e-9)

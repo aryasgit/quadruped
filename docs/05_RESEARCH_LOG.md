@@ -7,6 +7,36 @@ D-007; decision refs renumbered D-001…D-006.)
 
 ---
 
+## 2026-06-17 — FIRST HARDWARE STAND: the real robot stands via the new stack
+
+The full pipeline drove the physical robot for the first time:
+calibration → servo_map → staggered + slew-limited engage → PCA9685.
+
+**Calibration** (`tools/derive_calibration.py`, roadmap Plan D): derived from
+the legacy truths, anchored at the GUI-verified stand pose — the stand-pose IK
+angle maps to the legacy stand tick **exactly for all 12** (verified before
+energizing), with geometric slope ±1.5889 ticks/° (sign from each servo's
+inverted-mount flag). Committed `config/servo_calibration.yaml`.
+
+**Run** (`run_robot.py --hold`): engages DIRECTLY at stand (no crouch ramp, so
+no non-stand pose is ever commanded → unverified slope signs can't bite) and
+holds via the controller FSM.
+
+**Result:** commanded the correct stand joint angles (thighs 0.976 rad, wrists
+−1.73, coxa 0), **0 timing overruns @ 50 Hz**, and the robot stood **level**:
+IMU steady-state **roll −0.1° / pitch −0.7°** (median over 8 s, telemetry
+`artifacts/run-stand-*.jsonl`). The −41° pitch on the first frame was a
+complementary-filter transient — the first `imu.update()` integrated gyro over
+the ~2 s engage gap; **fixed by capping dt ≤ 0.05 s** in imu.update.
+
+**Caveats:** slope SIGNS unverified (standing is exact regardless of sign;
+WALKING needs per-servo sign verification on the stand first). The bounded-run
+timeout overran (tooling pipe/backgrounding quirk) → stopped cleanly + forced
+all-off, no harm. Visual confirmation of the physical pose pending from
+Aryaman.
+
+---
+
 ## 2026-06-17 — Gait speed-up: brisk cadence + velocity ramp (~3× faster, D-016)
 
 The velocity gait looked slow (~16–20 mm/s). Root cause: the vx clamp (0.024)
