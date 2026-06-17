@@ -43,18 +43,27 @@ def stick_to_velocity(lx, ly, cfg):
 def teleop_loop(pad, emit, step, estop=None, status=lambda m: print(m)):
     c = GaitConfig()
     cmd = GaitCommand(state="stand")
-    status("[teleop] STAND. CROSS=stand TRIANGLE=walk CIRCLE=idle SQUARE=estop "
-           "OPTIONS=quit | walk: L-stick move, R-stick X turn | stand: R-stick lean")
+    quit_hold = 0
+    status("[teleop] STAND. top=walk bottom=stand right=idle left=estop | "
+           "HOLD Start ~0.5s to quit (or close window) | walk: L-stick move, R-stick turn")
     while True:
         axes, btns, edges = pad.poll()
+        if edges:
+            status(f"[teleop] btn {sorted(edges)}")   # debug: what the pad sends
 
-        if "options" in edges:
-            status("[teleop] quit")
-            return
+        # Quit requires HOLDING options ~0.5s so a stray Start event can't kill
+        # the session (PS4 clones sometimes emit spurious Start/Mode events).
+        if btns.get("options"):
+            quit_hold += 1
+            if quit_hold >= 25:
+                status("[teleop] quit (held)")
+                return
+        else:
+            quit_hold = 0
+
         if "square" in edges and estop:
             # sim estop resets and keeps driving; hardware estop all-offs and
-            # exits the process itself — so DON'T return here (only OPTIONS or
-            # closing the window quits the session).
+            # exits the process itself.
             status("[teleop] ESTOP")
             estop()
         if "triangle" in edges:
