@@ -7,6 +7,28 @@ D-007; decision refs renumbered D-001…D-006.)
 
 ---
 
+## 2026-06-17 — Gait speed-up: brisk cadence + velocity ramp (~3× faster, D-016)
+
+The velocity gait looked slow (~16–20 mm/s). Root cause: the vx clamp (0.024)
+was limited by the harsh **from-reset transient** (a foot sweeping fully back
+before its first swing), not the steady state — the steady-state joint-safe
+vx is ~0.08. Fix:
+- **Velocity ramp** in the gait (rate-limited internal vx/vy/wz, `accel_*`) —
+  eases into/out of motion so a walk-start never sweeps a foot past a joint
+  limit; makes the steady-state envelope reachable from a standstill.
+- **Brisker cadence**: swing_ticks 16→10, shift_ticks 10→6 (cycle 2.08→1.28 s)
+  — same stride traversed faster ⇒ more speed at the same joint excursion.
+- Re-derived clamps: max_vx 0.024→**0.05**, max_vy 0.022→**0.05**,
+  max_wz 0.10→**0.22**.
+
+Result (sim, fidelity-on): **vel_forward 53 mm/s** (was ~16), median margin
+22 mm, **p10 +14.6 mm**, tilt 2.3°, no fall; controller_demo walks 318 mm
+(was 118). Forward p10 dips negative above ~vx 0.05 (transient COM dips, no
+fall), so the demo/default forward runs 0.045. 24/24 tests pass (the ramp
+keeps from-reset maxima in limits).
+
+---
+
 ## 2026-06-15 — Controller FSM completes the gait-control stack (D-017)
 
 **Built** `barq1/controller.py` — idle/stand/walk FSM driven by GaitCommand,

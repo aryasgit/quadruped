@@ -1,5 +1,12 @@
 # Changelog — newest first
 
+## 2026-06-17 — gait speed-up: brisk cadence + velocity ramp
+
+- `velocity_gait.py`: cadence swing 16→10 / shift 10→6 (cycle 1.28 s) + a
+  velocity ramp (`accel_*`) so walk-start eases in and stays in joint limits.
+  Clamps raised (vx 0.024→0.05, vy→0.05, wz→0.22); scenarios at vx 0.045.
+- ~3× faster (vel_forward 53 mm/s, p10 +14.6 mm, no fall). 24/24 pass.
+
 ## 2026-06-15 — controller FSM completes the gait stack (D-017)
 
 - `barq1/controller.py`: idle/stand/walk FSM, rate-limited height+posture

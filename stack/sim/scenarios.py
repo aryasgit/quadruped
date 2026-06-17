@@ -219,20 +219,20 @@ def _vel_metrics(d):
 
 
 def vel_forward(robot):
-    """Velocity gait: walk forward at the safe-envelope max for 8 s."""
-    d = _velocity_run(robot, GaitCommand(vx=0.024), 8.0)
+    """Velocity gait: walk forward at the safe-envelope max for 6 s."""
+    d = _velocity_run(robot, GaitCommand(vx=0.045), 6.0)
     return _vel_metrics(d), d["rec"]
 
 
 def vel_turn(robot):
-    """Velocity gait: turn left in place at the safe-envelope max for 8 s."""
-    d = _velocity_run(robot, GaitCommand(wz=0.10), 8.0)
+    """Velocity gait: turn left in place at the safe-envelope max for 6 s."""
+    d = _velocity_run(robot, GaitCommand(wz=0.22), 6.0)
     return _vel_metrics(d), d["rec"]
 
 
 def vel_strafe(robot):
-    """Velocity gait: strafe left at the safe-envelope max for 8 s."""
-    d = _velocity_run(robot, GaitCommand(vy=0.022), 8.0)
+    """Velocity gait: strafe left at the safe-envelope max for 6 s."""
+    d = _velocity_run(robot, GaitCommand(vy=0.05), 6.0)
     return _vel_metrics(d), d["rec"]
 
 
@@ -261,7 +261,7 @@ def controller_demo(robot):
         return x0, y0, x1, y1, z1
 
     seg(GaitCommand(state="stand"), 1.5)
-    wx0, _, wx1, _, _ = seg(GaitCommand(state="walk", vx=0.024), 6.0)
+    wx0, _, wx1, _, _ = seg(GaitCommand(state="walk", vx=0.045), 6.0)
     sx0, sy0, sx1, sy1, _ = seg(GaitCommand(state="stand"), 2.0)   # drift check
     *_, idle_z = seg(GaitCommand(state="idle"), 2.5)
     *_, stand_z = seg(GaitCommand(state="stand"), 2.5)

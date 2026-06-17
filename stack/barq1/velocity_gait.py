@@ -39,8 +39,8 @@ _SWING_BY_PHASE = {1: "RR", 3: "FR", 5: "RL", 7: "FL"}
 class GaitConfig:
     dt: float = 0.02            # 50 Hz
     stand_height: float = 0.155
-    swing_ticks: int = 16       # ticks per swing phase  (0.32 s)
-    shift_ticks: int = 10       # ticks per body-shift phase (0.20 s)
+    swing_ticks: int = 10       # ticks per swing phase  (0.20 s) — brisk cadence
+    shift_ticks: int = 6        # ticks per body-shift phase (0.12 s); cycle 1.28 s
     z_clearance: float = 0.045  # swing foot lift [m]
     alpha: float = 0.5          # fwd/back stride centering (spotMicro)
     beta: float = 0.5           # yaw stride centering (spotMicro)
@@ -50,18 +50,26 @@ class GaitConfig:
     back_shift: float = 0.005   # shift back when a FRONT leg swings
     side_shift: float = 0.022   # shift toward the stance side
     shift_gain: float = 0.20    # per-frame easing toward the shift target
-    # Speed clamps = the joint-safe envelope (scanned: each single-axis max
-    # keeps all joints inside their URDF limits with ~1.7 deg margin over a
-    # full cycle, both directions). Higher speeds saturate the thigh's tight
-    # upper limit (1.548 rad) on large/backward strides — raising the envelope
-    # needs a faster cadence or different stance height (future tuning, D-016).
-    max_vx: float = 0.024
-    max_vy: float = 0.022
-    max_wz: float = 0.10
+    # Speed clamps = the STEADY-STATE joint-safe envelope (scanned at this
+    # cadence; the velocity ramp below keeps the from-standstill transient
+    # inside limits too). Brisk cadence + ramp lifted these ~2.5x over the
+    # original from-reset-limited values (D-016 tuning, see 05 2026-06-15).
+    max_vx: float = 0.05
+    max_vy: float = 0.05
+    max_wz: float = 0.22
+    # velocity ramp rates (per second) — ease into/out of motion smoothly so
+    # walk-start never sweeps a foot past its joint limit.
+    accel_vx: float = 0.08
+    accel_vy: float = 0.08
+    accel_wz: float = 0.6
 
 
 def _clamp(v, m):
     return max(-m, min(m, v))
+
+
+def _ramp(cur, target, step):
+    return cur + max(-step, min(step, target - cur))
 
 
 class VelocityGait:
@@ -75,6 +83,7 @@ class VelocityGait:
         self.feet = {leg: list(self.neutral[leg]) for leg in LEGS}
         self.body = [0.0, 0.0, self.cfg.stand_height]
         self.tick = 0
+        self._v = [0.0, 0.0, 0.0]   # ramped (vx, vy, wz)
         # build the 8-phase schedule: [shift, swing] x4
         self._durs, self._swing_leg = [], []
         for idx in range(8):
@@ -147,9 +156,11 @@ class VelocityGait:
     def step(self, cmd: GaitCommand, dt=None):
         cfg = self.cfg
         dt = dt or cfg.dt
-        vx = _clamp(cmd.vx, cfg.max_vx)
-        vy = _clamp(cmd.vy, cfg.max_vy)
-        wz = _clamp(cmd.wz, cfg.max_wz)
+        # ramp the internal velocity toward the clamped command (smooth start)
+        self._v[0] = _ramp(self._v[0], _clamp(cmd.vx, cfg.max_vx), cfg.accel_vx * dt)
+        self._v[1] = _ramp(self._v[1], _clamp(cmd.vy, cfg.max_vy), cfg.accel_vy * dt)
+        self._v[2] = _ramp(self._v[2], _clamp(cmd.wz, cfg.max_wz), cfg.accel_wz * dt)
+        vx, vy, wz = self._v
 
         idx, sub = self._phase()
         swing_leg = self._swing_leg[idx]
