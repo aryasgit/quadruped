@@ -1,0 +1,54 @@
+meta:
+  generated: '2026-06-17'
+  method: "legacy-derived, stand-anchored (Plan D) \u2014 PROVISIONAL; slope signs\
+    \ unverified, safe for STAND only"
+  units: PCA9685 ticks @ 50 Hz
+servos:
+  FL_coxa:
+    channel: 7
+    zero_ticks: 167.0
+    slope_ticks_per_deg: 1.5889
+  FL_thigh:
+    channel: 9
+    zero_ticks: 283.17
+    slope_ticks_per_deg: 1.5889
+  FL_wrist:
+    channel: 11
+    zero_ticks: 386.49
+    slope_ticks_per_deg: 1.5889
+  FR_coxa:
+    channel: 6
+    zero_ticks: 180.0
+    slope_ticks_per_deg: -1.5889
+  FR_thigh:
+    channel: 8
+    zero_ticks: 349.83
+    slope_ticks_per_deg: -1.5889
+  FR_wrist:
+    channel: 10
+    zero_ticks: 141.51
+    slope_ticks_per_deg: -1.5889
+  RL_coxa:
+    channel: 1
+    zero_ticks: 185.0
+    slope_ticks_per_deg: 1.5889
+  RL_thigh:
+    channel: 3
+    zero_ticks: 295.17
+    slope_ticks_per_deg: 1.5889
+  RL_wrist:
+    channel: 5
+    zero_ticks: 386.49
+    slope_ticks_per_deg: 1.5889
+  RR_coxa:
+    channel: 0
+    zero_ticks: 175.0
+    slope_ticks_per_deg: -1.5889
+  RR_thigh:
+    channel: 2
+    zero_ticks: 352.83
+    slope_ticks_per_deg: -1.5889
+  RR_wrist:
+    channel: 4
+    zero_ticks: 141.51
+    slope_ticks_per_deg: -1.5889

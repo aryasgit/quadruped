@@ -39,6 +39,10 @@ def crouch_angles():
     return body_ik(stance_feet_world(tj.CROUCH_H), body_xyz=(0, 0, tj.CROUCH_H))
 
 
+def stand_angles():
+    return body_ik(stance_feet_world(tj.STAND_H), body_xyz=(0, 0, tj.STAND_H))
+
+
 def scenario_frames(name, cycles):
     if name == "stand":
         return tj.hold(stance_feet_world(tj.STAND_H), (0, 0, tj.STAND_H), (0, 0, 0), 3.0)
@@ -85,6 +89,9 @@ def main():
     ap.add_argument("--yes", action="store_true", help="skip the stand confirm")
     ap.add_argument("--teleop", action="store_true",
                     help="PS4 controller drives the robot (pose + TRIANGLE walk)")
+    ap.add_argument("--hold", action="store_true",
+                    help="engage directly at STAND and hold it (no crouch ramp, "
+                         "no scenario) until Ctrl-C — safe first-bring-up mode")
     args = ap.parse_args()
 
     try:
@@ -93,8 +100,9 @@ def main():
         print(f"[run_robot] {e}")
         return 1
 
+    near = "STAND" if args.hold else "crouch"
     if not (args.dry_run or args.yes):
-        ans = input("Robot ON THE STAND, legs free, hand-placed near crouch? [y/N] ")
+        ans = input(f"Robot ON THE STAND, legs free, hand-placed near {near}? [y/N] ")
         if ans.strip().lower() != "y":
             print("aborted.")
             return 1
@@ -119,23 +127,58 @@ def main():
     signal.signal(signal.SIGINT, lambda *_: (_panic(io, telem)))
 
     try:
-        print("[run] engaging crouch (staggered)…")
-        io.engage(crouch_angles())
-        time.sleep(1.0)
-        print("[run] ramping to stand…")
-        run(tj.stance_ramp(tj.CROUCH_H, tj.STAND_H, 3.0), io, telem, imu)
-        if args.teleop:
-            _teleop(args, io, telem, imu)
+        if args.hold:
+            # Safe first-bring-up: engage DIRECTLY at the verified stand pose
+            # (never command a non-stand pose, so unverified slope signs can't
+            # bite) and hold it until Ctrl-C.
+            _hold_stand(io, telem, imu)
         else:
-            print(f"[run] scenario: {args.scenario}")
-            run(scenario_frames(args.scenario, args.cycles), io, telem, imu)
-        print("[run] ramping down…")
-        run(tj.stance_ramp(tj.STAND_H, tj.CROUCH_H, 3.0), io, telem, imu)
+            print("[run] engaging crouch (staggered)…")
+            io.engage(crouch_angles())
+            time.sleep(1.0)
+            print("[run] ramping to stand…")
+            run(tj.stance_ramp(tj.CROUCH_H, tj.STAND_H, 3.0), io, telem, imu)
+            if args.teleop:
+                _teleop(args, io, telem, imu)
+            else:
+                print(f"[run] scenario: {args.scenario}")
+                run(scenario_frames(args.scenario, args.cycles), io, telem, imu)
+            print("[run] ramping down…")
+            run(tj.stance_ramp(tj.STAND_H, tj.CROUCH_H, 3.0), io, telem, imu)
     finally:
         io.all_off()
         telem.close()
         print("[run] all outputs OFF.")
     return 0
+
+
+def _hold_stand(io, telem, imu):
+    """Engage at the verified stand pose and hold it at 50 Hz until Ctrl-C."""
+    from barq1.command import GaitCommand
+    from barq1.controller import Controller
+    from barq1.kinematics import body_ik
+
+    ctrl = Controller(dt=tj.DT, start_state="stand")
+    print("[run] engaging STAND (staggered, slew-limited)…")
+    io.engage(stand_angles())
+    time.sleep(1.0)
+    print("[run] holding STAND. Ctrl-C (or kill -INT <pid>) -> all outputs OFF.")
+    nxt = time.monotonic()
+    i = 0
+    while True:
+        feet, xyz, rpy = ctrl.step(GaitCommand(state="stand"))
+        angles = io.apply(body_ik(feet, body_xyz=xyz, body_rpy=rpy))
+        rp = gy = None
+        if imu is not None:
+            rp, gy = imu.update()
+        telem.record(i, angles, rp, gy)
+        i += 1
+        nxt += tj.DT
+        lag = nxt - time.monotonic()
+        if lag > 0:
+            time.sleep(lag)
+        else:
+            nxt = time.monotonic()
 
 
 def _teleop(args, io, telem, imu):
