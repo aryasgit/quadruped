@@ -44,15 +44,17 @@ def teleop_loop(pad, emit, step, estop=None, status=lambda m: print(m)):
     c = GaitConfig()
     cmd = GaitCommand(state="stand")
     quit_hold = 0
-    status("[teleop] STAND. top=walk bottom=stand right=idle left=estop | "
-           "HOLD Start ~0.5s to quit (or close window) | walk: L-stick move, R-stick turn")
+    estop_hold = 0
+    status("[teleop] STAND. top=walk bottom=stand right=idle | "
+           "HOLD left ~0.4s = ESTOP, HOLD Start ~0.5s = quit | "
+           "walk: L-stick move, R-stick turn")
     while True:
         axes, btns, edges = pad.poll()
         if edges:
             status(f"[teleop] btn {sorted(edges)}")   # debug: what the pad sends
 
-        # Quit requires HOLDING options ~0.5s so a stray Start event can't kill
-        # the session (PS4 clones sometimes emit spurious Start/Mode events).
+        # Quit and estop both require a deliberate HOLD so a stray tap (the
+        # PS4 clone emits spurious Start/face events) can't kill the session.
         if btns.get("options"):
             quit_hold += 1
             if quit_hold >= 25:
@@ -61,11 +63,14 @@ def teleop_loop(pad, emit, step, estop=None, status=lambda m: print(m)):
         else:
             quit_hold = 0
 
-        if "square" in edges and estop:
-            # sim estop resets and keeps driving; hardware estop all-offs and
-            # exits the process itself.
-            status("[teleop] ESTOP")
-            estop()
+        if btns.get("square") and estop:
+            estop_hold += 1
+            if estop_hold >= 20:
+                status("[teleop] ESTOP (held)")
+                estop()
+                estop_hold = 0
+        else:
+            estop_hold = 0
         if "triangle" in edges:
             cmd.state = "walk"; status("[teleop] WALK")
         if "x" in edges:
