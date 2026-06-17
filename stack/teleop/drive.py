@@ -26,6 +26,20 @@ PITCH_AMP = 0.10
 YAW_AMP = 0.06          # planted-foot yaw is limited (D-015) — keep small
 
 
+def stick_to_velocity(lx, ly, cfg):
+    """Left stick -> 4-quadrant proportional body velocity.
+
+    The dominant axis selects the quadrant (front/back vs left/right), and
+    that axis's magnitude sets the speed — a small push = slow, full push =
+    max. Returns (vx, vy) in m/s; the other axis is zeroed so motion stays
+    cardinal (no diagonal blend). Sticks are already deadzoned + normalized
+    to [-1, 1] with stick-up = +ly, stick-left = -lx.
+    """
+    if abs(ly) >= abs(lx):
+        return ly * cfg.max_vx, 0.0        # front (+) / back (-)
+    return 0.0, -lx * cfg.max_vy           # left (+) / right (-)
+
+
 def teleop_loop(pad, emit, step, estop=None, status=lambda m: print(m)):
     c = GaitConfig()
     cmd = GaitCommand(state="stand")
@@ -48,9 +62,8 @@ def teleop_loop(pad, emit, step, estop=None, status=lambda m: print(m)):
             cmd.state = "idle"; status("[teleop] IDLE")
 
         if cmd.state == "walk":
-            cmd.vx = axes["ly"] * c.max_vx          # stick up = forward
-            cmd.vy = -axes["lx"] * c.max_vy         # stick left = +left
-            cmd.wz = -axes["rx"] * c.max_wz         # stick left = turn left
+            cmd.vx, cmd.vy = stick_to_velocity(axes["lx"], axes["ly"], c)  # L-stick 4-quadrant
+            cmd.wz = -axes["rx"] * c.max_wz         # R-stick X = turn (left = +)
             cmd.roll = cmd.pitch = cmd.yaw = 0.0
         else:
             cmd.roll = axes["rx"] * ROLL_AMP

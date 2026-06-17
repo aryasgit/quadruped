@@ -1,5 +1,13 @@
 # Changelog — newest first
 
+## 2026-06-17 — teleop: 4-quadrant proportional left stick
+
+- `teleop/drive.py`: left stick -> `stick_to_velocity()` dominant-axis
+  cardinal mapping (front/back = vx, left/right = strafe vy), proportional
+  to push; right stick X = turn. Evofox PS4-clone verified (enumerates as
+  "Wireless Controller", standard 0-255 axes / 304-316 buttons; no driver
+  change). `test_teleop_map.py` (4 tests). 28 pass.
+
 ## 2026-06-17 — gait speed-up: brisk cadence + velocity ramp
 
 - `velocity_gait.py`: cadence swing 16→10 / shift 10→6 (cycle 1.28 s) + a
