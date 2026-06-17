@@ -46,6 +46,7 @@ class Controller:
         self.h = RateLimitedFirstOrderFilter(dt, HEIGHT_TAU, h0, HEIGHT_RATE)
         self.rpy = Vec3Filter(dt, RPY_TAU, (0.0, 0.0, 0.0), RPY_RATE)
         self.feet = {leg: list(self.neutral[leg]) for leg in LEGS}
+        self._gait_active = False
 
     def _ease_feet_to_neutral(self, dt):
         lim = FOOT_RECENTER_RATE * dt
@@ -70,20 +71,25 @@ class Controller:
         else:
             rpy = self.rpy.run((0.0, 0.0, 0.0))
 
-        # 3) feet: gait while walking-and-up; otherwise ease to neutral
-        walking = desired == "walk" and at_stand
+        # 3) feet: cycle the gait only while walking, up to height, AND given a
+        #    nonzero velocity command. Walk mode with no input stays DORMANT
+        #    (hold stance, no leg cycling / body weave) so it never drifts.
+        walking = desired == "walk" and at_stand and cmd.is_moving
         if walking:
-            if self.state != "walk":
-                self.gait.reset()
+            if not self._gait_active:
+                self.gait.reset()          # restart cleanly from neutral
+                self._gait_active = True
             feet, body_xyz, _ = self.gait.step(cmd, dt)
             self.feet = {leg: list(feet[leg]) for leg in LEGS}
             bx, by = body_xyz[0], body_xyz[1]
             self.state = "walk"
         else:
+            self._gait_active = False
             self._ease_feet_to_neutral(dt)
             bx, by = 0.0, 0.0
             if at_stand:
-                self.state = desired if desired in ("stand", "idle") else "stand"
+                self.state = "walk" if desired == "walk" else \
+                    (desired if desired in ("stand", "idle") else self.state)
             elif desired == "idle" and h <= IDLE_HEIGHT + AT_HEIGHT_TOL:
                 self.state = "idle"
 

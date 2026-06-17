@@ -49,6 +49,27 @@ def test_walk_request_stands_first_then_cycles():
     assert c.state == "walk"                          # now walking
 
 
+def test_walk_with_no_input_is_dormant():
+    """Walk mode + centered stick = hold stance, zero drift (the circling bug)."""
+    c = Controller(start_state="stand")
+    feet = xyz = None
+    for _ in range(int(round(4.0 / c.dt))):
+        feet, xyz, _ = c.step(GaitCommand(state="walk"))   # no vx/vy/wz
+    for leg in LEGS:
+        assert abs(feet[leg][0] - c.neutral[leg][0]) < 1e-3
+        assert abs(feet[leg][1] - c.neutral[leg][1]) < 1e-3
+    assert xyz[0] == 0.0 and xyz[1] == 0.0     # body not weaving
+    assert c.state == "walk"                   # still in walk mode, ready to move
+
+
+def test_walk_resumes_after_dormant():
+    c = Controller(start_state="stand")
+    _run(c, GaitCommand(state="walk"), 1.0)            # dormant
+    assert not c._gait_active
+    _run(c, GaitCommand(state="walk", vx=0.04), 2.0)   # input -> cycles
+    assert c._gait_active and c.state == "walk"
+
+
 def test_full_sequence_stays_reachable():
     c = Controller(start_state="stand")
     for cmd, secs in ((GaitCommand(state="stand", roll=0.1), 1.0),
