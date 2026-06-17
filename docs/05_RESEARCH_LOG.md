@@ -7,6 +7,45 @@ D-007; decision refs renumbered D-001…D-006.)
 
 ---
 
+## 2026-06-15 — Real masses measured: robot is 1.76 kg, not 4.88 (Q-004 RESOLVED)
+
+**Measured** (Aryaman, per part, servos attached as-built — hip servo in the
+shoulder, one servo per leg segment, none in the body): center body 522 g,
+front cover 44, rear cover 30; per leg shoulder 81.5, upper leg 103.2
+(+ cover 19.9), shin 80.7, toe 6.3 → 291.6 g/leg × 4. **Total 1.76 kg**
+(battery tethered/excluded) — the placeholder was 4.88 kg, i.e. **2.8× too
+heavy** (body alone 2.8 kg guessed vs 0.52 measured). URDF masses updated;
+D-010 analytic inertias recompute from them. Frame + 20 tests still pass.
+
+**Re-baseline (old 4.88 kg → new 1.76 kg, fidelity-on):**
+
+| scenario | old | new |
+|---|---|---|
+| settle margin | 94.0 mm | 94.0 mm (geometric, unchanged) |
+| weight_shift 3-leg margin / tilt | 22.4 mm / 0.92° | 26.7 mm / 0.77° |
+| crawl distance / eff / min-margin | 117.7 mm / 98% / 12.4 mm | 122 mm / 102% / 4.3 mm |
+| vel_forward p10 margin / neg% | 8.6 mm / 9.4% | **17.9 mm / 0.6%** |
+| vel_forward distance | 132 mm | 160 mm |
+| vel_turn yaw (wz 0.10, 8 s) | +20.5° | +14° |
+
+**Findings.**
+1. **Velocity gait is markedly MORE stable with real mass** — forward p10
+   margin doubled (8.6 → 17.9 mm), negative-margin frames 9.4% → 0.6%. A
+   lighter robot is easier to keep statically balanced.
+2. **Servo torque headroom grew** — 3.0 N·m continuous now drives 1.76 kg;
+   actuator torque is not a transfer risk.
+3. **Open-loop net motion is mass-sensitive** — turn yaws less, forward
+   travels more, coupling shifted. Expected with no feedback (slip/grip ∝
+   mass); the IMU/heading loop (Stage D) nulls it. Velocity clamps unchanged
+   (joint-limit-derived, mass-independent).
+
+**Caveat (minor):** the 60 g servos dominate each leg segment, but the
+analytic box inertias still place each link's COM at its geometric centre;
+real COM is biased toward the servo. Mass totals are now correct; per-link
+COM offset is a future refinement (second-order for quasi-static gait).
+
+---
+
 ## 2026-06-15 — Gait control: velocity-commanded gait ported from spotMicro (D-016)
 
 **Why:** the diagnostic GUI confirmed the channel map + stand/perp poses on

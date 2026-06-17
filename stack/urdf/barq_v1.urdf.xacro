@@ -115,7 +115,7 @@
         </geometry>
         <origin rpy="0 0 0" xyz="0 0 0"/>
       </collision>
-      <xacro:box_inertial m="0.10" x="${shoulder_length}" y="${shoulder_width}" z="${body_height}"/>
+      <xacro:box_inertial m="0.0815" x="${shoulder_length}" y="${shoulder_width}" z="${body_height}"/>
     </link>
   </xacro:macro>
 
@@ -147,7 +147,7 @@
         </xacro:unless>
         <material name="yellow"/>
       </visual>
-      <xacro:box_inertial m="0.02" x="0.030" y="0.008" z="0.100" oz="-0.050"/>
+      <xacro:box_inertial m="0.0199" x="0.030" y="0.008" z="0.100" oz="-0.050"/>
     </link>
     <link name="${name}">
       <visual>
@@ -171,7 +171,7 @@
           <box size="0.028 0.036 ${leg_length}"/>
         </geometry>
       </collision>
-      <xacro:box_inertial m="0.15" x="0.028" y="0.036" z="${leg_length}" oz="-0.050"/>
+      <xacro:box_inertial m="0.1032" x="0.028" y="0.036" z="${leg_length}" oz="-0.050"/>
     </link>
   </xacro:macro>
 
@@ -215,7 +215,7 @@
         </geometry>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.050"/>
       </collision>
-      <xacro:box_inertial m="0.1" x="0.026" y="0.020" z="${foot_length}" oz="-0.050"/>
+      <xacro:box_inertial m="0.0807" x="0.026" y="0.020" z="${foot_length}" oz="-0.050"/>
     </link>
   </xacro:macro>
 
@@ -246,7 +246,7 @@
         <origin rpy="0 0 0" xyz="0 0 ${toe_radius}"/>
         <contact_coefficients mu="1.1" />
       </collision>
-      <xacro:sphere_inertial m="0.05" r="${toe_radius}" oz="${toe_radius}"/>
+      <xacro:sphere_inertial m="0.0063" r="${toe_radius}" oz="${toe_radius}"/>
     </link>
   </xacro:macro>
 
@@ -288,7 +288,7 @@
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
-    <xacro:box_inertial m="2.80" x="${body_length}" y="${body_width}" z="${body_height}"/>
+    <xacro:box_inertial m="0.522" x="${body_length}" y="${body_width}" z="${body_height}"/>
   </link>
 
   <link name="rear_link">
@@ -307,7 +307,7 @@
       <!-- rear of body: outboard of the rear shoulder module -->
       <origin rpy="0 0 0" xyz="-0.14575 0 0"/>
     </collision>
-    <xacro:box_inertial m="0.20" x="${rear_length}" y="${body_width}" z="${body_height}" ox="-0.14575"/>
+    <xacro:box_inertial m="0.030" x="${rear_length}" y="${body_width}" z="${body_height}" ox="-0.14575"/>
   </link>
   <joint name="base_rear" type="fixed">
     <parent link="base_link"/>
@@ -330,7 +330,7 @@
       <!-- front of body: outboard of the front shoulder module -->
       <origin rpy="0 0 0" xyz="0.15475 0 0"/>
     </collision>
-    <xacro:box_inertial m="0.20" x="${front_length}" y="${body_width}" z="${body_height}" ox="0.15475"/>
+    <xacro:box_inertial m="0.044" x="${front_length}" y="${body_width}" z="${body_height}" ox="0.15475"/>
   </link>
   <joint name="base_front" type="fixed">
     <parent link="base_link"/>

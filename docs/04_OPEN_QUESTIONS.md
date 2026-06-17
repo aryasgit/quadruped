@@ -31,14 +31,14 @@ D-006 assumes yes (107.5/130 mm axis-to-axis); Aryaman's CAD reads
 ~107.5 → stock confirmed; ~114 → custom legs, 2-line fix in
 `barq1/geometry.py` + xacro and re-run `tools/validate_urdf.py` + tests.
 
-## Q-004 — Real masses (opened 2026-06-12)
+## Q-004 — Real masses — RESOLVED 2026-06-15
 
-URDF masses are upstream guesses (body 2.8 kg, ~0.42 kg/leg → ~4.9 kg total).
-Sim fidelity (stability margins, tip-over) depends on them. Weigh the robot
-total; ideally also one leg's parts. Update the xacro inertials (D-010 uses
-analytic box/sphere inertias, so only masses need correcting).
-*2026-06-12: Aryaman is weighing parts during disassembly — numbers
-incoming; battery mass irrelevant (tethered, off-board).*
+URDF masses were upstream guesses (~4.9 kg). Aryaman measured per-part:
+**total 1.76 kg** (body 522 g, covers 44/30 g, 291.6 g/leg incl. one 60 g
+servo per segment, hip servo in the shoulder). URDF updated; re-baselined
+(05, 2026-06-15) — gait stability *improved* (forward p10 margin 8.6 →
+17.9 mm). Residual: per-link COM still at geometric centre though servos
+dominate — a second-order refinement, not blocking.
 
 ## Q-005 — INA260 integration (opened 2026-06-12)
 

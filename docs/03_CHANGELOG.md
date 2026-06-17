@@ -1,5 +1,14 @@
 # Changelog — newest first
 
+## 2026-06-15 — real masses in the URDF (Q-004 resolved)
+
+- All 8 link masses set to Aryaman's measured values: total **1.76 kg**
+  (was 4.88 kg placeholder). base_link 0.522, covers 0.044/0.030, per leg
+  shoulder 0.0815 / leg 0.1032 (+cover 0.0199) / foot 0.0807 / toe 0.0063.
+- Re-baselined (05, 2026-06-15): velocity gait stability improved
+  (vel_forward p10 margin 8.6 → 17.9 mm, neg-frames 9.4% → 0.6%); net
+  open-loop motion shifted (mass-dependent slip). 20 tests still pass.
+
 ## 2026-06-15 — velocity-commanded gait (D-016)
 
 - `barq1/command.py` (GaitCommand), `barq1/filters.py`

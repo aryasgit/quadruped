@@ -16,7 +16,8 @@ port) — forward / turn / strafe from one engine, all statically stable in
 sim (p10 margin ≥ 9 mm, tilt ≤ 2.6°, none fell). Joint-safe speed envelope
 vx 0.024 / vy 0.022 m/s / wz 0.10 rad/s (thigh upper limit binds). Fixed
 crawl + full hardware pipeline (dry-run-clean, 0 overruns) + PS4 teleop all
-still in place. Masses being weighed for the URDF (Q-004).
+still in place. **Real masses measured & in the URDF: 1.76 kg** (was 4.88
+placeholder; Q-004 resolved) — re-baselined, gait stability *improved*.
 
 **Next:** controller FSM (idle/stand/walk + filter transitions) → wire
 teleop + run_robot to it → drive the real robot (legacy-derived calib) to
