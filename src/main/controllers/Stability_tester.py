@@ -10,7 +10,7 @@ What this does:
   5. Ctrl+C to exit and return to stand
 
 Run:
-    cd /home/a/quadruped/src/main
+    cd /home/barq/quadruped/src/main
     python3 krish/test_stability.py
 
 Phases to test physically:

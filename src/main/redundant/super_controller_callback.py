@@ -3,27 +3,14 @@ super_controller_v1.py — Unified Main, Brace, and Stability Controller
 =======================================================================
 
 Modes:
-- Normal: Main controller for walking/tricks.
-          Brace controller runs when idle.
-          When a command arrives during brace, robot returns to neutral
-          stand before executing.
+- Normal: Main controller (controller_mark_5) for walking/tricks.
+          Brace controller runs when idle (no command received).
+          When a command arrives during brace, the robot first returns
+          to neutral stand before executing it.
 - Stability: Activated by 'p' (keyboard) or button 9 (gamepad).
-             All other control suspended. IMU posture correction runs.
-             Auto-exits after MAX_STABILITY_TIME seconds.
-             Any input shows exit prompt; press 'y' to confirm.
-             After exit: smooth lerp back to stand -> normal mode.
-
-Changes from original:
-  - reset_pid  replaced with reset_reference (canonical name)
-  - STAND_FEET deleted; stand_at_z(STANCE_Z) used everywhere
-  - strict_stand() now takes stance_z parameter (no height snap)
-  - smooth_stand() lerps _sc._dz to zero — no jerk on stability exit
-  - Watchdog: os.execv removed; uses recovery_requested Event instead
-  - Trick thread race fixed via _trick_stop Event
-  - TrickRunner class: centralised pre/post hooks for all tricks
-  - Stability mode: MAX_STABILITY_TIME auto-exit added
-  - Phase continuity: phase saved/restored across stability transitions
-  - BraceSuspended context manager: brace always clean entering/leaving stability
+             All other control is suspended. IMU posture correction runs.
+             Any input during stability shows exit prompt; press 'y' to confirm.
+             After exit: strict stand pose -> normal mode.
 """
 
 import sys
@@ -34,7 +21,6 @@ import math
 import tty
 import termios
 import select
-from contextlib import contextmanager
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -60,11 +46,7 @@ from stance.tricks import (
 
 # --- Sub-controllers ---
 from controllers.brace_controller import BraceController
-from controllers.stability_controller import posture_step, reset_reference
-
-# Access _dz dict live for smooth_stand lerp.
-# Import as module so reassignment inside reset_reference is always visible.
-import controllers.stability_controller as _sc
+from controllers.stability_controller import posture_step, reset_pid
 
 # NOTE: imu and brace are NOT initialised here — they require hardware
 # init (init_pca / init_mpu / calibrate) which must run inside main().
@@ -75,20 +57,11 @@ import controllers.stability_controller as _sc
 # =====================================================================
 
 FREQ             = 1.3
-DT               = 0.0134        # 50 Hz
+DT               = 0.02        # 50 Hz
 
-STEP_LENGTH      = 0.080
-STEP_HEIGHT      = 0.030
-DUTY             = 0.70
-
-# Backward gait tuning: keep support polygon safer and reduce tipping risk.
-BACKWARD_STEP_LENGTH_SCALE = 0.86
-BACKWARD_STEP_HEIGHT_SCALE = 1.08
-
-# Motion-only body pitch bias.
-# Positive values lean the body forward in this controller frame.
-MOTION_PITCH_BIAS = 0.006
-BACKWARD_PITCH_BIAS = 0.010
+STEP_LENGTH      = 0.10
+STEP_HEIGHT      = 0.045
+DUTY             = 0.80
 
 LATERAL_STEP_LENGTH = 0.03
 LATERAL_STEP_HEIGHT = 0.018
@@ -107,9 +80,9 @@ ANALOG_FREQ_MAX   = 2.2
 ANALOG_STEP_MIN   = 0.20
 ANALOG_STEP_MAX   = 0.8
 
-AXIS_LX = 0
-AXIS_LY = 1
-AXIS_RX = 3
+AXIS_LX = 0    # Left stick X  -> strafe
+AXIS_LY = 1    # Left stick Y  -> fwd/back (inverted)
+AXIS_RX = 3    # Right stick X -> turn
 
 ANALOG_RAMP_UP   = 5.0
 ANALOG_RAMP_DOWN = 4.0
@@ -135,24 +108,10 @@ COXA_DELTA_BIAS = {
     "FL": +1.5, "FR": +1.5, "RL": +1.5, "RR": +1.5,
 }
 
-# Dynamic lateral tilt via coxa offsets.
-# Positive strafe command means move right; we apply opposite-side body tilt.
-LATERAL_COXA_OPPOSE_GAIN = 2.5
-
 DIAG_A = ("FL", "RR")
 
-WATCHDOG_TIMEOUT = 5.0          # seconds — reduced from 15; os.execv is gone so safe to be aggressive
-MAX_STABILITY_TIME = 60.0       # seconds — stability auto-exit
-SMOOTH_STAND_FRAMES = 30        # frames for smooth_stand lerp (30 * 0.02s = 0.6s)
-
+WATCHDOG_TIMEOUT = 15.0
 watchdog_last_heartbeat = [time.time()]
-
-# Watchdog signals main loop to recover cleanly — no process restart.
-recovery_requested = threading.Event()
-
-# Trick thread abort signal — prevents race between trick thread and main thread on I2C bus.
-_trick_stop = threading.Event()
-
 
 # =====================================================================
 # KEY / BUTTON MAP
@@ -181,12 +140,12 @@ TRICK_MAP = {
     "combo": combo,
 }
 
-# Stability toggle — not in KEY_MAP by design (no conflict with tricks/movement)
+# Special: stability mode toggle (must not appear in KEY_MAP)
 STABILITY_KEY            = 'p'
-STABILITY_GAMEPAD_BUTTON = 9    # Back/Select
+STABILITY_GAMEPAD_BUTTON = 9    # Back/Select — not mapped to tricks
 
 # =====================================================================
-# SERVO CHANNEL MAP
+# SERVO CHANNEL MAP  (built after imports)
 # =====================================================================
 
 CHANNELS = {}
@@ -195,22 +154,29 @@ for _leg in ("FL", "FR", "RL", "RR"):
     CHANNELS[f"{_leg}_THIGH"] = THIGHS[f"T{_leg}"]
     CHANNELS[f"{_leg}_WRIST"] = WRISTS[f"W{_leg}"]
 
+STAND_FEET = {
+    "FL": (STANCE_X,  STANCE_Y, STANCE_Z),
+    "FR": (STANCE_X, -STANCE_Y, STANCE_Z),
+    "RL": (STANCE_X,  STANCE_Y, STANCE_Z),
+    "RR": (STANCE_X, -STANCE_Y, STANCE_Z),
+}
+
 
 # =====================================================================
 # WATCHDOG
 # =====================================================================
-# FIX #5: No longer restarts the process with os.execv.
-# Sets recovery_requested instead — main loop handles clean recovery.
-# IMU calibration is NOT re-run. Robot recovers in-place.
 
 def watchdog_thread():
     while True:
         time.sleep(1.0)
         elapsed = time.time() - watchdog_last_heartbeat[0]
         if elapsed > WATCHDOG_TIMEOUT:
-            print(f"\n[WATCHDOG] Main loop unresponsive for {elapsed:.1f}s — requesting in-place recovery.")
-            recovery_requested.set()
-            # Do NOT call os.execv — robot stays live, main loop handles it.
+            print(f"\n[WATCHDOG] Main loop unresponsive for {elapsed:.1f}s. Restarting...\n")
+            try:
+                execute_step(STAND_FEET)
+            except Exception:
+                pass
+            os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
 # =====================================================================
@@ -259,42 +225,16 @@ def lerp(a, b, t):
     return a + (b - a) * t
 
 
-def apply_motion_pitch_bias(feet, pitch_bias):
-    if abs(pitch_bias) < 1e-9:
-        return feet
-
-    return {
-        leg: (
-            x,
-            y,
-            z + (pitch_bias if leg in ("FL", "FR") else -pitch_bias),
-        )
-        for leg, (x, y, z) in feet.items()
-    }
-
-
 # =====================================================================
 # SERVO PIPELINE
 # =====================================================================
 
-def apply_coxa_bias(deltas, strafe_cmd=0.0):
+def apply_coxa_bias(deltas):
     biased = deltas.copy()
     for leg, bias in COXA_DELTA_BIAS.items():
         key = f"{leg}_COXA"
         if key in biased:
             biased[key] += bias
-
-    # Dynamic coxa bias to oppose lateral motion (left/right stride).
-    # strafe_cmd in [-1, +1]: -1 = left, +1 = right.
-    s = max(-1.0, min(1.0, strafe_cmd))
-    if abs(s) > 0.01:
-        for leg in ("FL", "FR", "RL", "RR"):
-            key = f"{leg}_COXA"
-            if key not in biased:
-                continue
-            side = +1.0 if leg in ("FL", "RL") else -1.0
-            biased[key] += -s * side * LATERAL_COXA_OPPOSE_GAIN
-
     return biased
 
 
@@ -303,13 +243,10 @@ def send_to_servos(physical):
         set_servo_angle(ch, physical[joint])
 
 
-def execute_step(feet, strafe_cmd=0.0):
-    # If trick thread is being aborted, suppress servo writes from the dying thread.
-    if _trick_stop.is_set():
-        return False
+def execute_step(feet):
     try:
         deltas = solve_all_legs(feet)
-        deltas = apply_coxa_bias(deltas, strafe_cmd)
+        deltas = apply_coxa_bias(deltas)
         deltas = apply_joint_conventions(deltas)
         physical = normalize_all(deltas)
         send_to_servos(physical)
@@ -319,50 +256,16 @@ def execute_step(feet, strafe_cmd=0.0):
         return False
 
 
-# FIX #4: stance_z parameter — no snap to STANCE_Z if in LOW/CROUCH.
-def strict_stand(stance_z=STANCE_Z):
-    """Apply stand pose firmly. Use for mode transitions that need a hard reset."""
+def strict_stand():
+    """Apply stand pose firmly. Use between mode transitions."""
     print("[POSE] Strict stand pose...")
     for _ in range(10):
-        execute_step(stand_at_z(stance_z))
+        execute_step(STAND_FEET)
         time.sleep(0.03)
 
 
-def smooth_stand(stance_z=STANCE_Z, n_frames=SMOOTH_STAND_FRAMES):
-    """
-    Lerp stability controller dZ offsets back to zero, then settle at stand.
-    Call this after stability mode exits — prevents servo jerk.
-    If no stability offsets are active (e.g. watchdog recovery), runs as a
-    plain slow stand which still prevents abrupt position commands.
-    """
-    # Snapshot current posture offsets from stability controller module-level dict.
-    # _sc._dz is the live dict — safe to read even if reset_reference was called early
-    # (values will just be zero, making this a no-op lerp).
-    start_dz = {leg: _sc._dz[leg] for leg in ("FL", "FR", "RL", "RR")}
-
-    for i in range(n_frames):
-        t = i / n_frames
-        feet = {
-            leg: (x, y, z + start_dz[leg] * (1.0 - t))
-            for leg, (x, y, z) in stand_at_z(stance_z).items()
-        }
-        execute_step(feet)
-        time.sleep(DT)
-
-    execute_step(stand_at_z(stance_z))
-
-
 def run_trick_with_timeout(trick_func, timeout=10.0):
-    """
-    FIX #6: Trick thread race fix.
-    _trick_stop event gates execute_step inside the trick thread.
-    If timeout fires: set _trick_stop (suppresses further servo writes from
-    trick thread), wait one DT for any in-flight write to complete, then
-    clear and return. Main thread is then sole servo owner.
-    """
-    _trick_stop.clear()
     result = [None]
-
     def target():
         try:
             trick_func()
@@ -370,82 +273,13 @@ def run_trick_with_timeout(trick_func, timeout=10.0):
         except Exception as e:
             print(f"[ERROR] Trick failed: {e}")
             result[0] = False
-
-    t = threading.Thread(target=target, daemon=True)
+    t = threading.Thread(target=target)
     t.start()
     t.join(timeout)
-
     if t.is_alive():
-        print("[WARN] Trick timed out — aborting trick thread.")
-        _trick_stop.set()
-        time.sleep(DT * 2)   # one write cycle margin before main thread takes over
-        _trick_stop.clear()
+        print("[WARN] Trick timed out, forcing stand pose.")
         return False
-
-    _trick_stop.clear()
     return result[0]
-
-
-# =====================================================================
-# TRICK RUNNER — centralised pre/post hooks
-# =====================================================================
-# NEW: eliminates scattered pre/post logic in both keyboard and gamepad loops.
-# Every trick goes through: stand at current_z → brace.reset → trick → stand().
-
-class TrickRunner:
-    """
-    Wraps every trick call with consistent pre/post behaviour.
-
-    Pre-hook : always execute stand_at_z(current_z) and reset brace,
-               regardless of whether the robot was moving.
-    Post-hook: call stand() to guarantee clean pose after trick.
-    """
-
-    def __init__(self, brace: BraceController, timeout: float = 10.0):
-        self._brace   = brace
-        self._timeout = timeout
-
-    def run(self, trick_name: str, current_z: float) -> bool:
-        func = TRICK_MAP.get(trick_name)
-        if func is None:
-            print(f"[TRICK] Unknown trick: {trick_name}")
-            return False
-
-        # --- pre ---
-        execute_step(stand_at_z(current_z))
-        self._brace.reset()
-        print(f"\n  Trick: {trick_name.upper()}")
-
-        # --- execute ---
-        result = run_trick_with_timeout(func, self._timeout)
-
-        # --- post ---
-        stand()
-        return result
-
-
-# =====================================================================
-# BRACE SUSPENDED CONTEXT MANAGER
-# =====================================================================
-# NEW: guarantees brace is reset on both normal exit AND exception from stability.
-# Replaces the scattered brace.reset() calls before/after stability blocks.
-
-@contextmanager
-def BraceSuspended(brace: BraceController):
-    """
-    Context manager that resets brace on entry and exit.
-    Use around any block where brace should not accumulate state
-    (stability mode, tricks that transition the full body).
-
-    Usage:
-        with BraceSuspended(brace):
-            run_stability_mode(...)
-    """
-    brace.reset()
-    try:
-        yield
-    finally:
-        brace.reset()
 
 
 # =====================================================================
@@ -461,46 +295,18 @@ def _lateral_trajectory(phase, step_length, step_height, duty):
     return -step_length / 2 + s * step_length, step_height * math.sin(math.pi * s)
 
 
-def should_mirror_diagonal_order(strafe, turn):
-    """
-    Mirror swing-order for mirrored lateral/yaw commands.
-    - right / turn_right: FR/RL first (default)
-    - left  / turn_left : FL/RR first (mirrored)
-    """
-    lat_mag = abs(strafe)
-    yaw_mag = abs(turn)
-
-    if lat_mag < 0.01 and yaw_mag < 0.01:
-        return False
-
-    if lat_mag >= yaw_mag:
-        return strafe < -0.01
-    return turn < -0.01
-
-
 def compute_feet_analog(phase, fwd, strafe, turn, step_scale, stance_z=STANCE_Z):
     shift_x = -fwd    * BODY_SHIFT_FWD
     shift_y = -strafe * BODY_SHIFT_LAT - turn * BODY_SHIFT_TURN
-    mirror_order = should_mirror_diagonal_order(strafe, turn)
     feet = {}
     for leg in ("FL", "FR", "RL", "RR"):
-        if mirror_order:
-            leg_phase = wrap_phase(phase + 0.5) if leg in DIAG_A else phase
-        else:
-            leg_phase = phase if leg in DIAG_A else wrap_phase(phase + 0.5)
+        leg_phase = phase if leg in DIAG_A else wrap_phase(phase + 0.5)
         dx_total = dy_total = 0.0
         dz_max = 0.0
 
         if abs(fwd) > 0.01:
-            backward = fwd < 0.0
-            fwd_len_scale = BACKWARD_STEP_LENGTH_SCALE if backward else 1.0
-            fwd_height_scale = BACKWARD_STEP_HEIGHT_SCALE if backward else 1.0
             dx_fb, dz_fb = _leg_trajectory(
-                leg_phase,
-                STEP_LENGTH * step_scale * abs(fwd) * fwd_len_scale,
-                STEP_HEIGHT * fwd_height_scale,
-                DUTY,
-            )
+                leg_phase, STEP_LENGTH * step_scale * abs(fwd), STEP_HEIGHT, DUTY)
             dx_fb *= (1.0 if fwd > 0 else -1.0)
             dx_total += dx_fb
             dz_max = max(dz_max, dz_fb)
@@ -508,49 +314,36 @@ def compute_feet_analog(phase, fwd, strafe, turn, step_scale, stance_z=STANCE_Z)
         if abs(strafe) > 0.01:
             s_phase = wrap_phase(1.0 - leg_phase) if strafe < 0 else leg_phase
             dy_s, dz_s = _lateral_trajectory(
-                s_phase, LATERAL_STEP_LENGTH * step_scale * abs(strafe),
-                LATERAL_STEP_HEIGHT, DUTY)
+                s_phase, LATERAL_STEP_LENGTH * step_scale * abs(strafe), LATERAL_STEP_HEIGHT, DUTY)
             dy_s *= +1 if leg in ("FR", "RR") else -1
             dy_total += dy_s
             dz_max = max(dz_max, dz_s)
 
         if abs(turn) > 0.01:
             dx_t, dz_t = _leg_trajectory(
-                leg_phase, TURN_STEP_LENGTH * step_scale * abs(turn),
-                TURN_STEP_HEIGHT, DUTY)
+                leg_phase, TURN_STEP_LENGTH * step_scale * abs(turn), TURN_STEP_HEIGHT, DUTY)
             turn_sign = 1.0 if turn > 0 else -1.0
             dx_t = +dx_t * turn_sign if leg in ("FL", "RL") else -dx_t * turn_sign
             dx_total += dx_t
             dz_max = max(dz_max, dz_t)
 
         base_y = STANCE_Y if leg in ("FL", "RL") else -STANCE_Y
-        feet[leg] = (
-            STANCE_X + dx_total + shift_x,
-            base_y   + dy_total + shift_y,
-            stance_z + dz_max,
-        )
-
-    motion_mag = min(1.0, math.sqrt(fwd * fwd + strafe * strafe + turn * turn))
-    pitch_bias = MOTION_PITCH_BIAS * motion_mag
-    if fwd < -0.01:
-        pitch_bias += BACKWARD_PITCH_BIAS * min(1.0, abs(fwd))
-
-    feet = apply_motion_pitch_bias(feet, pitch_bias)
+        feet[leg] = (STANCE_X + dx_total + shift_x, base_y + dy_total + shift_y, stance_z + dz_max)
     return feet
 
 
 def compute_feet_directional(phase, direction, stance_z=STANCE_Z):
-    if direction == "forward":      return compute_feet_analog(phase,  1.0, 0.0, 0.0, 1.0, stance_z)
-    elif direction == "backward":   return compute_feet_analog(phase, -1.0, 0.0, 0.0, 1.0, stance_z)
-    elif direction == "left":       return compute_feet_analog(phase, 0.0, -1.0, 0.0, 1.0, stance_z)
-    elif direction == "right":      return compute_feet_analog(phase, 0.0,  1.0, 0.0, 1.0, stance_z)
-    elif direction == "turn_left":  return compute_feet_analog(phase, 0.0, 0.0, -1.0, 1.0, stance_z)
-    elif direction == "turn_right": return compute_feet_analog(phase, 0.0, 0.0,  1.0, 1.0, stance_z)
-    else:                           return stand_at_z(stance_z)
+    if direction == "forward":     return compute_feet_analog(phase,  1.0, 0.0, 0.0, 1.0, stance_z)
+    elif direction == "backward":  return compute_feet_analog(phase, -1.0, 0.0, 0.0, 1.0, stance_z)
+    elif direction == "left":      return compute_feet_analog(phase, 0.0, -1.0, 0.0, 1.0, stance_z)
+    elif direction == "right":     return compute_feet_analog(phase, 0.0,  1.0, 0.0, 1.0, stance_z)
+    elif direction == "turn_left": return compute_feet_analog(phase, 0.0, 0.0, -1.0, 1.0, stance_z)
+    elif direction == "turn_right":return compute_feet_analog(phase, 0.0, 0.0,  1.0, 1.0, stance_z)
+    else:                          return stand_at_z(stance_z)
 
 
 # =====================================================================
-# SINGLE-CYCLE EXECUTION
+# SINGLE-CYCLE EXECUTION (keyboard / D-pad)
 # =====================================================================
 
 def execute_single_cycle(direction, stance_z=STANCE_Z):
@@ -566,24 +359,18 @@ def execute_single_cycle(direction, stance_z=STANCE_Z):
     single_cycle_duration = 1.0 / freq
     total_duration = single_cycle_duration * num_cycles
 
-    lateral_cmd = -1.0 if direction == "left" else (1.0 if direction == "right" else 0.0)
-
     while True:
         loop_start = time.time()
         elapsed = loop_start - cycle_start
         if elapsed >= total_duration:
             break
         phase = (elapsed / single_cycle_duration) % 1.0
-        feet = apply_ramp(
-            compute_feet_directional(phase, direction, stance_z),
-            ramp_factor(elapsed, total_duration), stance_z)
-        execute_step(feet, lateral_cmd)
+        feet = apply_ramp(compute_feet_directional(phase, direction, stance_z),
+                          ramp_factor(elapsed, total_duration), stance_z)
+        execute_step(feet)
         progress = int((elapsed / total_duration) * 10)
-        print(
-            f"\r  Executing: {label} "
-            f"[{'='*progress}{' '*(10-progress)}] "
-            f"ramp:{int(ramp_factor(elapsed, total_duration)*100):3d}%",
-            end="", flush=True)
+        print(f"\r  Executing: {label} [{'='*progress}{' '*(10-progress)}] ramp:{int(ramp_factor(elapsed, total_duration)*100):3d}%",
+              end="", flush=True)
         time.sleep(max(0, DT - (time.time() - loop_start)))
 
     print(f"\r  Executing: {label} [==========] ramp:  0% Done")
@@ -611,9 +398,9 @@ def apply_deadzone(value, deadzone=ANALOG_DEADZONE):
 
 def read_sticks(controller):
     return (
-        apply_deadzone(-controller.get_axis(AXIS_LY)),
-        apply_deadzone( controller.get_axis(AXIS_LX)),
-        apply_deadzone( controller.get_axis(AXIS_RX)),
+        apply_deadzone(-controller.get_axis(AXIS_LY)),   # fwd
+        apply_deadzone( controller.get_axis(AXIS_LX)),   # strafe
+        apply_deadzone( controller.get_axis(AXIS_RX)),   # turn
     )
 
 
@@ -633,45 +420,27 @@ def poll_dpad(controller):
 def poll_buttons(controller):
     lt = controller.get_axis(2)
     rt = controller.get_axis(5)
-    if lt > 0.7:                   return '3'
-    if rt > 0.7:                   return '2'
-    if controller.get_button(4):   return '1'
-    if controller.get_button(5):   return '5'
-    if controller.get_button(1):   return '4'
-    if controller.get_button(0):   return '9'
-    if controller.get_button(3):   return 'c'
-    if controller.get_button(2):   return 'x'
-    if controller.get_button(6):   return '7'
-    if controller.get_button(7):   return '6'
+    if lt > 0.7:                   return '3'   # LT -> Wiggle
+    if rt > 0.7:                   return '2'   # RT -> Bow
+    if controller.get_button(4):   return '1'   # LB -> Shake
+    if controller.get_button(5):   return '5'   # RB -> Bheek
+    if controller.get_button(1):   return '4'   # B  -> Pushups
+    if controller.get_button(0):   return '9'   # A  -> Tilt Dance
+    if controller.get_button(3):   return 'c'   # Y  -> Height
+    if controller.get_button(2):   return 'x'   # X  -> Quit
+    if controller.get_button(6):   return '7'   # M1 -> Sit
+    if controller.get_button(7):   return '6'   # M2 -> High Five
     return None
 
 
-def _wait_button_release(controller, timeout_s=1.5):
-    """
-    Wait for gamepad inputs to settle after a command button press.
-
-    Uses the same trigger thresholds as poll_buttons() and includes a timeout
-    so noisy axes cannot deadlock the main loop.
-    """
-    t0 = time.time()
+def _wait_button_release(controller):
     while True:
         pygame.event.pump()
         any_pressed = any(controller.get_button(i) for i in range(controller.get_numbuttons()))
-
-        # Match press semantics used in poll_buttons(): triggers count only when
-        # pushed high, not by absolute magnitude (some pads rest near -1.0).
-        lt = controller.get_axis(2)
-        rt = controller.get_axis(5)
-        if lt > 0.7 or rt > 0.7:
+        if abs(controller.get_axis(2)) > 0.5 or abs(controller.get_axis(5)) > 0.5:
             any_pressed = True
-
         if not any_pressed:
             break
-
-        if time.time() - t0 > timeout_s:
-            print("[INPUT] Release wait timeout; continuing.")
-            break
-
         time.sleep(0.02)
 
 
@@ -680,6 +449,7 @@ def _wait_button_release(controller, timeout_s=1.5):
 # =====================================================================
 
 def get_key_blocking():
+    """Read one key in raw mode (blocks until key pressed)."""
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
@@ -693,6 +463,10 @@ def get_key_blocking():
 
 
 def get_key_timeout(timeout_s):
+    """
+    Non-blocking key read with timeout.
+    Returns the key character, or None if no key pressed within timeout_s.
+    """
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
@@ -711,60 +485,42 @@ def get_key_timeout(timeout_s):
 # =====================================================================
 # STABILITY MODE
 # =====================================================================
-# CHANGES:
-#   - Takes stance_z so stand commands match current height mode
-#   - MAX_STABILITY_TIME auto-exit added
-#   - reset_reference() only at entry; smooth_stand in CALLER handles exit
-#   - Comment added above send_to_servos — posture_step output is already physical
-#   - brace.reset() removed — BraceSuspended context manager handles it in caller
 
-def run_stability_mode(imu, use_gamepad, controller, stance_z=STANCE_Z):
+def run_stability_mode(imu, use_gamepad, controller):
     """
-    Runs stability controller exclusively until exit is confirmed or timeout.
-
-    stance_z  : current height mode Z — stand commands use this, not STANCE_Z
-    Returns   : nothing. Caller calls smooth_stand(stance_z) then reset_reference().
+    Runs stability controller exclusively until exit is confirmed.
+    Any input triggers the exit prompt; press 'y' (keyboard) or
+    button 9 again (gamepad) to confirm. Returns when done.
+    Caller must call strict_stand() after this returns.
     """
     print("\n[STABILITY] Stability mode ACTIVE — IMU posture control running.")
-    print(f"[STABILITY] Auto-exit after {MAX_STABILITY_TIME:.0f}s.")
     if use_gamepad:
-        print("[STABILITY] Press any button/stick to show exit prompt.")
+        print("[STABILITY] Press any button / move stick to show exit prompt.")
         print("[STABILITY] Then press button 9 to confirm exit.")
     else:
         print("[STABILITY] Press any key to show exit prompt, then 'y' to confirm.")
-
-    # Clean entry — zero any stale posture state from previous sessions.
-    reset_reference()
-
-    t_enter = time.time()
+    reset_pid()
 
     while True:
-        watchdog_last_heartbeat[0] = time.time()
+        watchdog_last_heartbeat[0] = time.time()   # keep watchdog alive
         loop_top = time.time()
-
-        # --- Auto-exit on timeout ---
-        if time.time() - t_enter > MAX_STABILITY_TIME:
-            print(f"\n[STABILITY] Auto-timeout after {MAX_STABILITY_TIME:.0f}s. Exiting.")
-            break
 
         # --- Run stability controller ---
         if imu is not None:
             try:
-                # posture_step returns fully-processed physical angles.
-                # DO NOT pipe through execute_step — that would double-apply conventions.
-                physical = posture_step(stand_at_z(stance_z), imu)
+                physical = posture_step(STAND_FEET, imu)
                 send_to_servos(physical)
             except Exception as e:
                 print(f"\n[WARN] Stability step error: {e}")
-                execute_step(stand_at_z(stance_z))
+                execute_step(STAND_FEET)
         else:
-            execute_step(stand_at_z(stance_z))
+            execute_step(STAND_FEET)
 
         # --- Check for exit input ---
         if use_gamepad:
             pygame.event.pump()
-            any_input = any(
-                controller.get_button(i) for i in range(controller.get_numbuttons()))
+            # Any button press or significant stick movement triggers prompt
+            any_input = any(controller.get_button(i) for i in range(controller.get_numbuttons()))
             fwd, strafe, turn = read_sticks(controller)
             if stick_magnitude(fwd, strafe, turn) > 0.3:
                 any_input = True
@@ -776,7 +532,7 @@ def run_stability_mode(imu, use_gamepad, controller, stance_z=STANCE_Z):
                 confirmed = False
                 while time.time() - t_wait < 5.0:
                     pygame.event.pump()
-                    execute_step(stand_at_z(stance_z))
+                    execute_step(STAND_FEET)
                     if controller.get_button(STABILITY_GAMEPAD_BUTTON):
                         confirmed = True
                         _wait_button_release(controller)
@@ -790,10 +546,7 @@ def run_stability_mode(imu, use_gamepad, controller, stance_z=STANCE_Z):
         else:
             key = get_key_timeout(DT)
             if key is not None:
-                print(
-                    f"\n[STABILITY] Input ('{key}') detected. "
-                    f"Press 'y' to exit stability mode: ",
-                    end="", flush=True)
+                print(f"\n[STABILITY] Input ('{key}') detected. Press 'y' to exit stability mode: ", end="", flush=True)
                 confirm = get_key_timeout(5.0)
                 if confirm == 'y':
                     print("Y")
@@ -806,9 +559,7 @@ def run_stability_mode(imu, use_gamepad, controller, stance_z=STANCE_Z):
 
         time.sleep(max(0, DT - (time.time() - loop_top)))
 
-    # NOTE: do NOT call reset_reference() here.
-    # Caller reads _sc._dz via smooth_stand() to lerp offsets to zero first,
-    # then calls reset_reference() to clean up state.
+    reset_pid()
     print("[STABILITY] Stability mode deactivated.")
 
 
@@ -830,26 +581,13 @@ def main_gamepad(controller, gamepad_name, imu, brace):
     moving       = False
     last_fwd = last_strafe = last_turn = 0.0
 
-    trick_runner = TrickRunner(brace)
-
-    execute_step(stand_at_z(current_z))
+    execute_step(STAND_FEET)
     time.sleep(0.5)
     print("[INIT] Ready!\n")
 
     try:
         while True:
             watchdog_last_heartbeat[0] = time.time()
-
-            # --- Watchdog recovery (FIX #5: replaces os.execv restart) ---
-            if recovery_requested.is_set():
-                print("\n[WATCHDOG] In-place recovery: returning to stand...")
-                smooth_stand(current_z)
-                reset_reference()
-                phase = 0.0; ramp_level = 0.0; moving = False
-                recovery_requested.clear()
-                watchdog_last_heartbeat[0] = time.time()
-                continue
-
             loop_top = time.time()
             pygame.event.pump()
 
@@ -858,22 +596,12 @@ def main_gamepad(controller, gamepad_name, imu, brace):
                 _wait_button_release(controller)
                 if moving:
                     execute_step(stand_at_z(current_z))
-                    moving = False; ramp_level = 0.0
-
-                # Save phase for continuity — restoring avoids foot-slam on first walk frame.
-                saved_phase = phase
-
-                with BraceSuspended(brace):
-                    run_stability_mode(imu, True, controller, current_z)
-
-                # Smooth exit: lerp stability dZ offsets to zero, THEN reset state.
-                smooth_stand(current_z)
-                reset_reference()
-
-                # Restore phase continuity.
-                phase = saved_phase
-                ramp_level = 0.0
-                moving = False
+                    moving = False; ramp_level = 0.0; phase = 0.0
+                brace.reset()
+                strict_stand()
+                run_stability_mode(imu, True, controller)
+                strict_stand()
+                phase = 0.0; ramp_level = 0.0; moving = False
                 continue
 
             # --- Trick / height / quit buttons ---
@@ -883,7 +611,6 @@ def main_gamepad(controller, gamepad_name, imu, brace):
                 if cmd == "quit":
                     print("\n[QUIT] Exiting...")
                     break
-
                 if cmd == "height":
                     old_z = current_z
                     height_index = (height_index + 1) % len(HEIGHT_MODES)
@@ -894,10 +621,13 @@ def main_gamepad(controller, gamepad_name, imu, brace):
                     phase = 0.0; ramp_level = 0.0; moving = False
                     _wait_button_release(controller)
                     continue
-
                 if cmd in TRICK_MAP:
-                    trick_runner.run(cmd, current_z)
-                    moving = False; ramp_level = 0.0; phase = 0.0
+                    if moving:
+                        execute_step(stand_at_z(current_z))
+                        moving = False; ramp_level = 0.0; phase = 0.0
+                    print(f"\n  Trick: {cmd.upper()}")
+                    run_trick_with_timeout(TRICK_MAP[cmd], timeout=10.0)
+                    stand()
                     _wait_button_release(controller)
                     continue
 
@@ -918,24 +648,24 @@ def main_gamepad(controller, gamepad_name, imu, brace):
             mag = stick_magnitude(fwd, strafe, turn)
 
             if mag > 0.01:
+                # Moving — ramp in, advance phase
                 last_fwd, last_strafe, last_turn = fwd, strafe, turn
                 freq       = lerp(ANALOG_FREQ_MIN, ANALOG_FREQ_MAX, mag)
                 step_scale = lerp(ANALOG_STEP_MIN,  ANALOG_STEP_MAX,  mag)
                 ramp_level = min(1.0, ramp_level + ANALOG_RAMP_UP * DT)
                 phase = wrap_phase(phase + freq * DT)
-                feet = apply_ramp(
-                    compute_feet_analog(phase, fwd, strafe, turn, step_scale, current_z),
-                    ramp_level, current_z)
-                execute_step(feet, strafe)
+                feet = apply_ramp(compute_feet_analog(phase, fwd, strafe, turn, step_scale, current_z),
+                                  ramp_level, current_z)
+                execute_step(feet)
                 moving = True
                 bar = int(mag * 10)
-                print(
-                    f"\r  ANALOG [{HEIGHT_MODES[height_index][0]}] "
-                    f"F:{fwd:+.2f} S:{strafe:+.2f} T:{turn:+.2f} "
-                    f"|{'|'*bar}{'.'*(10-bar)}| {freq:.1f}Hz ramp:{ramp_level:.0%}   ",
-                    end="", flush=True)
+                print(f"\r  ANALOG [{HEIGHT_MODES[height_index][0]}] "
+                      f"F:{fwd:+.2f} S:{strafe:+.2f} T:{turn:+.2f} "
+                      f"|{'|'*bar}{'.'*(10-bar)}| {freq:.1f}Hz ramp:{ramp_level:.0%}   ",
+                      end="", flush=True)
 
             elif moving:
+                # Stick released: ramp out
                 ramp_level -= ANALOG_RAMP_DOWN * DT
                 if ramp_level <= RAMP_MIN:
                     execute_step(stand_at_z(current_z))
@@ -945,20 +675,16 @@ def main_gamepad(controller, gamepad_name, imu, brace):
                     freq = lerp(ANALOG_FREQ_MIN, ANALOG_FREQ_MAX, 0.3)
                     phase = wrap_phase(phase + freq * DT)
                     feet = apply_ramp(
-                        compute_feet_analog(
-                            phase, last_fwd, last_strafe, last_turn,
-                            ANALOG_STEP_MIN, current_z),
+                        compute_feet_analog(phase, last_fwd, last_strafe, last_turn, ANALOG_STEP_MIN, current_z),
                         ramp_level, current_z)
-                    execute_step(feet, last_strafe)
+                    execute_step(feet)
 
             else:
                 # IDLE: brace controller active
                 if imu is not None:
                     offsets = brace.update(imu)
-                    brace_feet = {
-                        leg: (x, y, z + offsets[leg])
-                        for leg, (x, y, z) in stand_at_z(current_z).items()
-                    }
+                    brace_feet = {leg: (x, y, z + offsets[leg])
+                                  for leg, (x, y, z) in stand_at_z(current_z).items()}
                     execute_step(brace_feet)
                 else:
                     execute_step(stand_at_z(current_z))
@@ -969,7 +695,7 @@ def main_gamepad(controller, gamepad_name, imu, brace):
         print("\n[INTERRUPT] Caught Ctrl+C")
     finally:
         print("[SHUTDOWN] Returning to stand...")
-        execute_step(stand_at_z(STANCE_Z))
+        execute_step(STAND_FEET)
         print("[SHUTDOWN] Done.")
 
 
@@ -985,34 +711,21 @@ def main_keyboard(imu, brace):
     print("        6=HiFive 7=Sit 8=Stretch 9=TiltDance 0=Combo")
     print("-" * 55)
 
-    execute_step(stand_at_z(STANCE_Z))
+    execute_step(STAND_FEET)
     time.sleep(0.5)
     print("[INIT] Ready!\n")
 
     height_index = 1
-    current_z    = HEIGHT_MODES[height_index][1]
-    phase        = 0.0
-    trick_runner = TrickRunner(brace)
+    current_z = HEIGHT_MODES[height_index][1]
 
     try:
         while True:
             watchdog_last_heartbeat[0] = time.time()
-
-            # --- Watchdog recovery ---
-            if recovery_requested.is_set():
-                print("\n[WATCHDOG] In-place recovery: returning to stand...")
-                smooth_stand(current_z)
-                reset_reference()
-                phase = 0.0
-                recovery_requested.clear()
-                watchdog_last_heartbeat[0] = time.time()
-                continue
-
             mode_name = HEIGHT_MODES[height_index][0]
             brace_str = "brace+imu" if imu is not None else "no imu"
             print(f"\nWaiting [{mode_name}] ({brace_str}): ", end="", flush=True)
 
-            # Non-blocking key wait: run brace steps between polls.
+            # Non-blocking key wait: run brace steps between polls
             key = None
             brace_was_active = False
             while key is None:
@@ -1021,13 +734,10 @@ def main_keyboard(imu, brace):
                 if key is None:
                     if imu is not None:
                         offsets = brace.update(imu)
-                        # FIX #3: brace.active property now exists in BraceController
                         if brace.active:
                             brace_was_active = True
-                        brace_feet = {
-                            leg: (x, y, z + offsets[leg])
-                            for leg, (x, y, z) in stand_at_z(current_z).items()
-                        }
+                        brace_feet = {leg: (x, y, z + offsets[leg])
+                                      for leg, (x, y, z) in stand_at_z(current_z).items()}
                         execute_step(brace_feet)
                     else:
                         execute_step(stand_at_z(current_z))
@@ -1036,14 +746,10 @@ def main_keyboard(imu, brace):
 
             # --- Stability mode ---
             if key == STABILITY_KEY:
-                saved_phase = phase
-
-                with BraceSuspended(brace):
-                    run_stability_mode(imu, False, None, current_z)
-
-                smooth_stand(current_z)
-                reset_reference()
-                phase = saved_phase
+                brace.reset()
+                strict_stand()
+                run_stability_mode(imu, False, None)
+                strict_stand()
                 continue
 
             if key not in KEY_MAP:
@@ -1052,9 +758,9 @@ def main_keyboard(imu, brace):
 
             command = KEY_MAP[key]
 
-            # Return to neutral if brace was compensating before executing command.
+            # Return to neutral if brace was compensating
             if brace_was_active:
-                print("[BRACE] Returning to neutral before command...")
+                print("[BRACE] Returning to neutral before executing command...")
                 brace.reset()
                 for _ in range(5):
                     execute_step(stand_at_z(current_z))
@@ -1073,7 +779,9 @@ def main_keyboard(imu, brace):
                 current_z = new_z
 
             elif command in TRICK_MAP:
-                trick_runner.run(command, current_z)
+                print(f"  Trick: {command.upper()}")
+                run_trick_with_timeout(TRICK_MAP[command], timeout=10.0)
+                stand()
 
             else:
                 execute_single_cycle(command, current_z)
@@ -1084,7 +792,7 @@ def main_keyboard(imu, brace):
         print("\n[INTERRUPT] Caught Ctrl+C")
     finally:
         print("[SHUTDOWN] Returning to stand...")
-        execute_step(stand_at_z(STANCE_Z))
+        execute_step(STAND_FEET)
         print("[SHUTDOWN] Done.")
 
 
@@ -1097,6 +805,7 @@ def main():
     print("  SUPER CONTROLLER  (Main + Brace + Stability)")
     print("=" * 55)
 
+    # --- Hardware init (must happen before watchdog starts) ---
     print("[INIT] PCA9685 servo driver...")
     init_pca()
 
@@ -1108,8 +817,10 @@ def main():
     imu = IMUFilter(calib)
     print("[INIT] IMU ready.")
 
+    # --- Brace controller ---
     brace = BraceController()
 
+    # --- Gamepad detection ---
     use_gamepad = False
     controller = None
     gamepad_name = ""
@@ -1125,7 +836,7 @@ def main():
         except Exception:
             pass
 
-    # Start watchdog AFTER hardware init — calibration must not trip it.
+    # --- Start watchdog AFTER hardware init so calibration doesn't trip it ---
     watchdog_last_heartbeat[0] = time.time()
     threading.Thread(target=watchdog_thread, daemon=True).start()
 

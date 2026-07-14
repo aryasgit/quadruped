@@ -3,7 +3,7 @@ controllers/brace_tester.py — Rich Terminal Visualizer for Brace Controller
 =============================================================================
 
 Run:
-    cd /home/a/quadruped/src/main
+    cd /home/barq/quadruped/src/main
     python3 controllers/brace_tester.py
 
 What it does:

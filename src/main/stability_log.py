@@ -24,6 +24,14 @@ Changes from original:
   - Stability mode: MAX_STABILITY_TIME auto-exit added
   - Phase continuity: phase saved/restored across stability transitions
   - BraceSuspended context manager: brace always clean entering/leaving stability
+
+Logging additions (PATCH):
+  - StabilityLogger imported from tools.stability_logger
+  - run_stability_mode() gains optional logger= parameter
+  - logger.start() called at stability entry
+  - logger.record(imu) called after every posture_step tick
+  - logger.save() called in callers (gamepad + keyboard) after mode exits
+  - sc_module=_sc passed at logger construction so _dz is snapshotted live
 """
 
 import sys
@@ -63,11 +71,11 @@ from controllers.brace_controller import BraceController
 from controllers.stability_controller import posture_step, reset_reference
 
 # Access _dz dict live for smooth_stand lerp.
-# Import as module so reassignment inside reset_reference is always visible.
 import controllers.stability_controller as _sc
 
-# NOTE: imu and brace are NOT initialised here — they require hardware
-# init (init_pca / init_mpu / calibrate) which must run inside main().
+# ── PATCH: stability data logger ──────────────────────────────────────
+from tools.stability_logger import StabilityLogger
+# ──────────────────────────────────────────────────────────────────────
 
 
 # =====================================================================
@@ -75,20 +83,11 @@ import controllers.stability_controller as _sc
 # =====================================================================
 
 FREQ             = 1.3
-DT               = 0.0134        # 50 Hz
+DT               = 0.02        # 50 Hz
 
-STEP_LENGTH      = 0.080
-STEP_HEIGHT      = 0.030
-DUTY             = 0.70
-
-# Backward gait tuning: keep support polygon safer and reduce tipping risk.
-BACKWARD_STEP_LENGTH_SCALE = 0.86
-BACKWARD_STEP_HEIGHT_SCALE = 1.08
-
-# Motion-only body pitch bias.
-# Positive values lean the body forward in this controller frame.
-MOTION_PITCH_BIAS = 0.006
-BACKWARD_PITCH_BIAS = 0.010
+STEP_LENGTH      = 0.10
+STEP_HEIGHT      = 0.045
+DUTY             = 0.80
 
 LATERAL_STEP_LENGTH = 0.03
 LATERAL_STEP_HEIGHT = 0.018
@@ -135,22 +134,14 @@ COXA_DELTA_BIAS = {
     "FL": +1.5, "FR": +1.5, "RL": +1.5, "RR": +1.5,
 }
 
-# Dynamic lateral tilt via coxa offsets.
-# Positive strafe command means move right; we apply opposite-side body tilt.
-LATERAL_COXA_OPPOSE_GAIN = 2.5
-
 DIAG_A = ("FL", "RR")
 
-WATCHDOG_TIMEOUT = 5.0          # seconds — reduced from 15; os.execv is gone so safe to be aggressive
-MAX_STABILITY_TIME = 60.0       # seconds — stability auto-exit
-SMOOTH_STAND_FRAMES = 30        # frames for smooth_stand lerp (30 * 0.02s = 0.6s)
+WATCHDOG_TIMEOUT = 5.0
+MAX_STABILITY_TIME = 60.0
+SMOOTH_STAND_FRAMES = 30
 
 watchdog_last_heartbeat = [time.time()]
-
-# Watchdog signals main loop to recover cleanly — no process restart.
 recovery_requested = threading.Event()
-
-# Trick thread abort signal — prevents race between trick thread and main thread on I2C bus.
 _trick_stop = threading.Event()
 
 
@@ -181,9 +172,9 @@ TRICK_MAP = {
     "combo": combo,
 }
 
-# Stability toggle — not in KEY_MAP by design (no conflict with tricks/movement)
 STABILITY_KEY            = 'p'
-STABILITY_GAMEPAD_BUTTON = 9    # Back/Select
+STABILITY_GAMEPAD_BUTTON = 9
+
 
 # =====================================================================
 # SERVO CHANNEL MAP
@@ -199,9 +190,6 @@ for _leg in ("FL", "FR", "RL", "RR"):
 # =====================================================================
 # WATCHDOG
 # =====================================================================
-# FIX #5: No longer restarts the process with os.execv.
-# Sets recovery_requested instead — main loop handles clean recovery.
-# IMU calibration is NOT re-run. Robot recovers in-place.
 
 def watchdog_thread():
     while True:
@@ -210,7 +198,6 @@ def watchdog_thread():
         if elapsed > WATCHDOG_TIMEOUT:
             print(f"\n[WATCHDOG] Main loop unresponsive for {elapsed:.1f}s — requesting in-place recovery.")
             recovery_requested.set()
-            # Do NOT call os.execv — robot stays live, main loop handles it.
 
 
 # =====================================================================
@@ -259,42 +246,16 @@ def lerp(a, b, t):
     return a + (b - a) * t
 
 
-def apply_motion_pitch_bias(feet, pitch_bias):
-    if abs(pitch_bias) < 1e-9:
-        return feet
-
-    return {
-        leg: (
-            x,
-            y,
-            z + (pitch_bias if leg in ("FL", "FR") else -pitch_bias),
-        )
-        for leg, (x, y, z) in feet.items()
-    }
-
-
 # =====================================================================
 # SERVO PIPELINE
 # =====================================================================
 
-def apply_coxa_bias(deltas, strafe_cmd=0.0):
+def apply_coxa_bias(deltas):
     biased = deltas.copy()
     for leg, bias in COXA_DELTA_BIAS.items():
         key = f"{leg}_COXA"
         if key in biased:
             biased[key] += bias
-
-    # Dynamic coxa bias to oppose lateral motion (left/right stride).
-    # strafe_cmd in [-1, +1]: -1 = left, +1 = right.
-    s = max(-1.0, min(1.0, strafe_cmd))
-    if abs(s) > 0.01:
-        for leg in ("FL", "FR", "RL", "RR"):
-            key = f"{leg}_COXA"
-            if key not in biased:
-                continue
-            side = +1.0 if leg in ("FL", "RL") else -1.0
-            biased[key] += -s * side * LATERAL_COXA_OPPOSE_GAIN
-
     return biased
 
 
@@ -303,13 +264,12 @@ def send_to_servos(physical):
         set_servo_angle(ch, physical[joint])
 
 
-def execute_step(feet, strafe_cmd=0.0):
-    # If trick thread is being aborted, suppress servo writes from the dying thread.
+def execute_step(feet):
     if _trick_stop.is_set():
         return False
     try:
         deltas = solve_all_legs(feet)
-        deltas = apply_coxa_bias(deltas, strafe_cmd)
+        deltas = apply_coxa_bias(deltas)
         deltas = apply_joint_conventions(deltas)
         physical = normalize_all(deltas)
         send_to_servos(physical)
@@ -319,9 +279,7 @@ def execute_step(feet, strafe_cmd=0.0):
         return False
 
 
-# FIX #4: stance_z parameter — no snap to STANCE_Z if in LOW/CROUCH.
 def strict_stand(stance_z=STANCE_Z):
-    """Apply stand pose firmly. Use for mode transitions that need a hard reset."""
     print("[POSE] Strict stand pose...")
     for _ in range(10):
         execute_step(stand_at_z(stance_z))
@@ -329,17 +287,7 @@ def strict_stand(stance_z=STANCE_Z):
 
 
 def smooth_stand(stance_z=STANCE_Z, n_frames=SMOOTH_STAND_FRAMES):
-    """
-    Lerp stability controller dZ offsets back to zero, then settle at stand.
-    Call this after stability mode exits — prevents servo jerk.
-    If no stability offsets are active (e.g. watchdog recovery), runs as a
-    plain slow stand which still prevents abrupt position commands.
-    """
-    # Snapshot current posture offsets from stability controller module-level dict.
-    # _sc._dz is the live dict — safe to read even if reset_reference was called early
-    # (values will just be zero, making this a no-op lerp).
     start_dz = {leg: _sc._dz[leg] for leg in ("FL", "FR", "RL", "RR")}
-
     for i in range(n_frames):
         t = i / n_frames
         feet = {
@@ -348,18 +296,10 @@ def smooth_stand(stance_z=STANCE_Z, n_frames=SMOOTH_STAND_FRAMES):
         }
         execute_step(feet)
         time.sleep(DT)
-
     execute_step(stand_at_z(stance_z))
 
 
 def run_trick_with_timeout(trick_func, timeout=10.0):
-    """
-    FIX #6: Trick thread race fix.
-    _trick_stop event gates execute_step inside the trick thread.
-    If timeout fires: set _trick_stop (suppresses further servo writes from
-    trick thread), wait one DT for any in-flight write to complete, then
-    clear and return. Main thread is then sole servo owner.
-    """
     _trick_stop.clear()
     result = [None]
 
@@ -378,7 +318,7 @@ def run_trick_with_timeout(trick_func, timeout=10.0):
     if t.is_alive():
         print("[WARN] Trick timed out — aborting trick thread.")
         _trick_stop.set()
-        time.sleep(DT * 2)   # one write cycle margin before main thread takes over
+        time.sleep(DT * 2)
         _trick_stop.clear()
         return False
 
@@ -387,20 +327,10 @@ def run_trick_with_timeout(trick_func, timeout=10.0):
 
 
 # =====================================================================
-# TRICK RUNNER — centralised pre/post hooks
+# TRICK RUNNER
 # =====================================================================
-# NEW: eliminates scattered pre/post logic in both keyboard and gamepad loops.
-# Every trick goes through: stand at current_z → brace.reset → trick → stand().
 
 class TrickRunner:
-    """
-    Wraps every trick call with consistent pre/post behaviour.
-
-    Pre-hook : always execute stand_at_z(current_z) and reset brace,
-               regardless of whether the robot was moving.
-    Post-hook: call stand() to guarantee clean pose after trick.
-    """
-
     def __init__(self, brace: BraceController, timeout: float = 10.0):
         self._brace   = brace
         self._timeout = timeout
@@ -410,16 +340,10 @@ class TrickRunner:
         if func is None:
             print(f"[TRICK] Unknown trick: {trick_name}")
             return False
-
-        # --- pre ---
         execute_step(stand_at_z(current_z))
         self._brace.reset()
         print(f"\n  Trick: {trick_name.upper()}")
-
-        # --- execute ---
         result = run_trick_with_timeout(func, self._timeout)
-
-        # --- post ---
         stand()
         return result
 
@@ -427,20 +351,9 @@ class TrickRunner:
 # =====================================================================
 # BRACE SUSPENDED CONTEXT MANAGER
 # =====================================================================
-# NEW: guarantees brace is reset on both normal exit AND exception from stability.
-# Replaces the scattered brace.reset() calls before/after stability blocks.
 
 @contextmanager
 def BraceSuspended(brace: BraceController):
-    """
-    Context manager that resets brace on entry and exit.
-    Use around any block where brace should not accumulate state
-    (stability mode, tricks that transition the full body).
-
-    Usage:
-        with BraceSuspended(brace):
-            run_stability_mode(...)
-    """
     brace.reset()
     try:
         yield
@@ -461,46 +374,18 @@ def _lateral_trajectory(phase, step_length, step_height, duty):
     return -step_length / 2 + s * step_length, step_height * math.sin(math.pi * s)
 
 
-def should_mirror_diagonal_order(strafe, turn):
-    """
-    Mirror swing-order for mirrored lateral/yaw commands.
-    - right / turn_right: FR/RL first (default)
-    - left  / turn_left : FL/RR first (mirrored)
-    """
-    lat_mag = abs(strafe)
-    yaw_mag = abs(turn)
-
-    if lat_mag < 0.01 and yaw_mag < 0.01:
-        return False
-
-    if lat_mag >= yaw_mag:
-        return strafe < -0.01
-    return turn < -0.01
-
-
 def compute_feet_analog(phase, fwd, strafe, turn, step_scale, stance_z=STANCE_Z):
     shift_x = -fwd    * BODY_SHIFT_FWD
     shift_y = -strafe * BODY_SHIFT_LAT - turn * BODY_SHIFT_TURN
-    mirror_order = should_mirror_diagonal_order(strafe, turn)
     feet = {}
     for leg in ("FL", "FR", "RL", "RR"):
-        if mirror_order:
-            leg_phase = wrap_phase(phase + 0.5) if leg in DIAG_A else phase
-        else:
-            leg_phase = phase if leg in DIAG_A else wrap_phase(phase + 0.5)
+        leg_phase = phase if leg in DIAG_A else wrap_phase(phase + 0.5)
         dx_total = dy_total = 0.0
         dz_max = 0.0
 
         if abs(fwd) > 0.01:
-            backward = fwd < 0.0
-            fwd_len_scale = BACKWARD_STEP_LENGTH_SCALE if backward else 1.0
-            fwd_height_scale = BACKWARD_STEP_HEIGHT_SCALE if backward else 1.0
             dx_fb, dz_fb = _leg_trajectory(
-                leg_phase,
-                STEP_LENGTH * step_scale * abs(fwd) * fwd_len_scale,
-                STEP_HEIGHT * fwd_height_scale,
-                DUTY,
-            )
+                leg_phase, STEP_LENGTH * step_scale * abs(fwd), STEP_HEIGHT, DUTY)
             dx_fb *= (1.0 if fwd > 0 else -1.0)
             dx_total += dx_fb
             dz_max = max(dz_max, dz_fb)
@@ -529,13 +414,6 @@ def compute_feet_analog(phase, fwd, strafe, turn, step_scale, stance_z=STANCE_Z)
             base_y   + dy_total + shift_y,
             stance_z + dz_max,
         )
-
-    motion_mag = min(1.0, math.sqrt(fwd * fwd + strafe * strafe + turn * turn))
-    pitch_bias = MOTION_PITCH_BIAS * motion_mag
-    if fwd < -0.01:
-        pitch_bias += BACKWARD_PITCH_BIAS * min(1.0, abs(fwd))
-
-    feet = apply_motion_pitch_bias(feet, pitch_bias)
     return feet
 
 
@@ -566,8 +444,6 @@ def execute_single_cycle(direction, stance_z=STANCE_Z):
     single_cycle_duration = 1.0 / freq
     total_duration = single_cycle_duration * num_cycles
 
-    lateral_cmd = -1.0 if direction == "left" else (1.0 if direction == "right" else 0.0)
-
     while True:
         loop_start = time.time()
         elapsed = loop_start - cycle_start
@@ -577,7 +453,7 @@ def execute_single_cycle(direction, stance_z=STANCE_Z):
         feet = apply_ramp(
             compute_feet_directional(phase, direction, stance_z),
             ramp_factor(elapsed, total_duration), stance_z)
-        execute_step(feet, lateral_cmd)
+        execute_step(feet)
         progress = int((elapsed / total_duration) * 10)
         print(
             f"\r  Executing: {label} "
@@ -646,32 +522,14 @@ def poll_buttons(controller):
     return None
 
 
-def _wait_button_release(controller, timeout_s=1.5):
-    """
-    Wait for gamepad inputs to settle after a command button press.
-
-    Uses the same trigger thresholds as poll_buttons() and includes a timeout
-    so noisy axes cannot deadlock the main loop.
-    """
-    t0 = time.time()
+def _wait_button_release(controller):
     while True:
         pygame.event.pump()
         any_pressed = any(controller.get_button(i) for i in range(controller.get_numbuttons()))
-
-        # Match press semantics used in poll_buttons(): triggers count only when
-        # pushed high, not by absolute magnitude (some pads rest near -1.0).
-        lt = controller.get_axis(2)
-        rt = controller.get_axis(5)
-        if lt > 0.7 or rt > 0.7:
+        if abs(controller.get_axis(2)) > 0.5 or abs(controller.get_axis(5)) > 0.5:
             any_pressed = True
-
         if not any_pressed:
             break
-
-        if time.time() - t0 > timeout_s:
-            print("[INPUT] Release wait timeout; continuing.")
-            break
-
         time.sleep(0.02)
 
 
@@ -709,32 +567,166 @@ def get_key_timeout(timeout_s):
 
 
 # =====================================================================
-# STABILITY MODE
+# STABILITY COUNTDOWN
 # =====================================================================
-# CHANGES:
-#   - Takes stance_z so stand commands match current height mode
-#   - MAX_STABILITY_TIME auto-exit added
-#   - reset_reference() only at entry; smooth_stand in CALLER handles exit
-#   - Comment added above send_to_servos — posture_step output is already physical
-#   - brace.reset() removed — BraceSuspended context manager handles it in caller
 
-def run_stability_mode(imu, use_gamepad, controller, stance_z=STANCE_Z):
+# Big block digits — each is a list of 5 strings, 5 chars wide.
+_BIG_DIGITS = {
+    '5': [
+        " ███ ",
+        " █   ",
+        " ███ ",
+        "   █ ",
+        " ███ ",
+    ],
+    '4': [
+        " █ █ ",
+        " █ █ ",
+        " ███ ",
+        "   █ ",
+        "   █ ",
+    ],
+    '3': [
+        " ███ ",
+        "   █ ",
+        " ███ ",
+        "   █ ",
+        " ███ ",
+    ],
+    '2': [
+        " ███ ",
+        "   █ ",
+        " ███ ",
+        " █   ",
+        " ███ ",
+    ],
+    '1': [
+        "  █  ",
+        "  █  ",
+        "  █  ",
+        "  █  ",
+        "  █  ",
+    ],
+    'G': [
+        " ███ ",
+        " █   ",
+        " █ █ ",
+        " █ █ ",
+        " ███ ",
+    ],
+    'O': [
+        " ███ ",
+        " █ █ ",
+        " █ █ ",
+        " █ █ ",
+        " ███ ",
+    ],
+    '!': [
+        "  █  ",
+        "  █  ",
+        "  █  ",
+        "     ",
+        "  █  ",
+    ],
+}
+
+def _print_big(chars, prefix=''):
+    """Print a string of characters in large block font, all on one line."""
+    rows = [''] * 5
+    for ch in chars:
+        glyph = _BIG_DIGITS.get(ch, ['      '] * 5)
+        for i in range(5):
+            rows[i] += glyph[i] + '  '
+    sys.stdout.write('\n')
+    for row in rows:
+        sys.stdout.write(prefix + row + '\n')
+    sys.stdout.write('\n')
+    sys.stdout.flush()
+
+
+STABILITY_COUNTDOWN_SECS = 5   # change to 3 if you want a shorter wait
+
+
+def stability_countdown(imu, stance_z, countdown=STABILITY_COUNTDOWN_SECS):
+    """
+    Counts down from `countdown` to GO, printing large block digits.
+    The robot continues standing and running posture_step on each tick
+    so it is actively stable when you give the sync knock.
+
+    Logger has NOT started yet — the knock will be the first sharp event.
+    """
+    print("\n" + "─" * 44)
+    print("  STAND BY — STABILITY MODE STARTING IN:")
+    print("─" * 44)
+
+    for n in range(countdown, 0, -1):
+        _print_big(str(n), prefix='    ')
+
+        # Hold this digit on screen for 1 second, running servo loop throughout.
+        t0 = time.time()
+        while time.time() - t0 < 1.0:
+            watchdog_last_heartbeat[0] = time.time()
+            loop_top = time.time()
+            if imu is not None:
+                try:
+                    physical = posture_step(stand_at_z(stance_z), imu)
+                    send_to_servos(physical)
+                except Exception:
+                    execute_step(stand_at_z(stance_z))
+            else:
+                execute_step(stand_at_z(stance_z))
+            elapsed = time.time() - loop_top
+            time.sleep(max(0, DT - elapsed))
+
+    _print_big('GO!', prefix='    ')
+    print("─" * 44)
+    print("  LOGGING STARTED — GIVE SYNC KNOCK NOW")
+    print("─" * 44 + "\n")
+
+
+# =====================================================================
+# STABILITY MODE  (PATCHED — logger= parameter added)
+# =====================================================================
+
+def run_stability_mode(
+    imu,
+    use_gamepad,
+    controller,
+    stance_z=STANCE_Z,
+    logger=None,                    # ── PATCH: optional StabilityLogger ──
+):
     """
     Runs stability controller exclusively until exit is confirmed or timeout.
 
-    stance_z  : current height mode Z — stand commands use this, not STANCE_Z
-    Returns   : nothing. Caller calls smooth_stand(stance_z) then reset_reference().
+    stance_z : current height mode Z
+    logger   : StabilityLogger instance, or None to skip logging.
+               Pass a pre-constructed StabilityLogger — this function calls
+               logger.start() at entry and records every tick, but does NOT
+               call logger.save(); the caller is responsible for that so it
+               can handle the returned path.
     """
-    print("\n[STABILITY] Stability mode ACTIVE — IMU posture control running.")
-    print(f"[STABILITY] Auto-exit after {MAX_STABILITY_TIME:.0f}s.")
+    print("\n[STABILITY] Stability mode triggered.")
     if use_gamepad:
         print("[STABILITY] Press any button/stick to show exit prompt.")
         print("[STABILITY] Then press button 9 to confirm exit.")
     else:
         print("[STABILITY] Press any key to show exit prompt, then 'y' to confirm.")
 
-    # Clean entry — zero any stale posture state from previous sessions.
+    # ── Countdown: robot stays live, logger has not started yet ───────
+    # Robot is actively stabilising during the countdown so it is settled
+    # before you give the sync knock. The knock is the first sharp event
+    # in the log — used to align video to JSON in extract_frames.py.
+    stability_countdown(imu, stance_z)
+    # ──────────────────────────────────────────────────────────────────
+
     reset_reference()
+
+    # ── PATCH: start logger clock — AFTER countdown ───────────────────
+    if logger is not None:
+        logger.start()
+    print(f"\n[STABILITY] Stability mode ACTIVE — logging running.")
+    print(f"[STABILITY] Auto-exit after {MAX_STABILITY_TIME:.0f}s.")
+    # ──────────────────────────────────────────────────────────────────
 
     t_enter = time.time()
 
@@ -754,11 +746,20 @@ def run_stability_mode(imu, use_gamepad, controller, stance_z=STANCE_Z):
                 # DO NOT pipe through execute_step — that would double-apply conventions.
                 physical = posture_step(stand_at_z(stance_z), imu)
                 send_to_servos(physical)
+
+                # ── PATCH: log roll/pitch + dZ offsets after every tick ────
+                # imu filter has been updated inside posture_step, so
+                # imu.roll / imu.pitch are current-frame values here.
+                if logger is not None:
+                    logger.record(imu)
+                # ──────────────────────────────────────────────────────────
+
             except Exception as e:
                 print(f"\n[WARN] Stability step error: {e}")
                 execute_step(stand_at_z(stance_z))
         else:
             execute_step(stand_at_z(stance_z))
+            # Note: no logging branch when imu is None — nothing useful to record.
 
         # --- Check for exit input ---
         if use_gamepad:
@@ -806,14 +807,11 @@ def run_stability_mode(imu, use_gamepad, controller, stance_z=STANCE_Z):
 
         time.sleep(max(0, DT - (time.time() - loop_top)))
 
-    # NOTE: do NOT call reset_reference() here.
-    # Caller reads _sc._dz via smooth_stand() to lerp offsets to zero first,
-    # then calls reset_reference() to clean up state.
     print("[STABILITY] Stability mode deactivated.")
 
 
 # =====================================================================
-# GAMEPAD MAIN LOOP
+# GAMEPAD MAIN LOOP  (PATCHED — logger constructed + saved)
 # =====================================================================
 
 def main_gamepad(controller, gamepad_name, imu, brace):
@@ -840,7 +838,6 @@ def main_gamepad(controller, gamepad_name, imu, brace):
         while True:
             watchdog_last_heartbeat[0] = time.time()
 
-            # --- Watchdog recovery (FIX #5: replaces os.execv restart) ---
             if recovery_requested.is_set():
                 print("\n[WATCHDOG] In-place recovery: returning to stand...")
                 smooth_stand(current_z)
@@ -860,17 +857,31 @@ def main_gamepad(controller, gamepad_name, imu, brace):
                     execute_step(stand_at_z(current_z))
                     moving = False; ramp_level = 0.0
 
-                # Save phase for continuity — restoring avoids foot-slam on first walk frame.
                 saved_phase = phase
 
-                with BraceSuspended(brace):
-                    run_stability_mode(imu, True, controller, current_z)
+                # ── PATCH: construct logger for this stability session ─────
+                logger = StabilityLogger(
+                    output_dir="logs",
+                    stance_z=current_z,
+                    sc_module=_sc,
+                )
+                # ──────────────────────────────────────────────────────────
 
-                # Smooth exit: lerp stability dZ offsets to zero, THEN reset state.
+                with BraceSuspended(brace):
+                    run_stability_mode(
+                        imu, True, controller, current_z,
+                        logger=logger,              # ── PATCH ──
+                    )
+
                 smooth_stand(current_z)
                 reset_reference()
 
-                # Restore phase continuity.
+                # ── PATCH: flush log to disk after mode exits cleanly ──────
+                json_path, csv_path = logger.save()
+                print(f"[LOGGER] JSON → {json_path}")
+                print(f"[LOGGER] CSV  → {csv_path}")
+                # ──────────────────────────────────────────────────────────
+
                 phase = saved_phase
                 ramp_level = 0.0
                 moving = False
@@ -926,7 +937,7 @@ def main_gamepad(controller, gamepad_name, imu, brace):
                 feet = apply_ramp(
                     compute_feet_analog(phase, fwd, strafe, turn, step_scale, current_z),
                     ramp_level, current_z)
-                execute_step(feet, strafe)
+                execute_step(feet)
                 moving = True
                 bar = int(mag * 10)
                 print(
@@ -949,10 +960,9 @@ def main_gamepad(controller, gamepad_name, imu, brace):
                             phase, last_fwd, last_strafe, last_turn,
                             ANALOG_STEP_MIN, current_z),
                         ramp_level, current_z)
-                    execute_step(feet, last_strafe)
+                    execute_step(feet)
 
             else:
-                # IDLE: brace controller active
                 if imu is not None:
                     offsets = brace.update(imu)
                     brace_feet = {
@@ -974,7 +984,7 @@ def main_gamepad(controller, gamepad_name, imu, brace):
 
 
 # =====================================================================
-# KEYBOARD MAIN LOOP
+# KEYBOARD MAIN LOOP  (PATCHED — logger constructed + saved)
 # =====================================================================
 
 def main_keyboard(imu, brace):
@@ -998,7 +1008,6 @@ def main_keyboard(imu, brace):
         while True:
             watchdog_last_heartbeat[0] = time.time()
 
-            # --- Watchdog recovery ---
             if recovery_requested.is_set():
                 print("\n[WATCHDOG] In-place recovery: returning to stand...")
                 smooth_stand(current_z)
@@ -1012,7 +1021,6 @@ def main_keyboard(imu, brace):
             brace_str = "brace+imu" if imu is not None else "no imu"
             print(f"\nWaiting [{mode_name}] ({brace_str}): ", end="", flush=True)
 
-            # Non-blocking key wait: run brace steps between polls.
             key = None
             brace_was_active = False
             while key is None:
@@ -1021,7 +1029,6 @@ def main_keyboard(imu, brace):
                 if key is None:
                     if imu is not None:
                         offsets = brace.update(imu)
-                        # FIX #3: brace.active property now exists in BraceController
                         if brace.active:
                             brace_was_active = True
                         brace_feet = {
@@ -1038,11 +1045,29 @@ def main_keyboard(imu, brace):
             if key == STABILITY_KEY:
                 saved_phase = phase
 
+                # ── PATCH: construct logger for this stability session ─────
+                logger = StabilityLogger(
+                    output_dir="logs",
+                    stance_z=current_z,
+                    sc_module=_sc,
+                )
+                # ──────────────────────────────────────────────────────────
+
                 with BraceSuspended(brace):
-                    run_stability_mode(imu, False, None, current_z)
+                    run_stability_mode(
+                        imu, False, None, current_z,
+                        logger=logger,              # ── PATCH ──
+                    )
 
                 smooth_stand(current_z)
                 reset_reference()
+
+                # ── PATCH: flush log to disk ───────────────────────────────
+                json_path, csv_path = logger.save()
+                print(f"[LOGGER] JSON → {json_path}")
+                print(f"[LOGGER] CSV  → {csv_path}")
+                # ──────────────────────────────────────────────────────────
+
                 phase = saved_phase
                 continue
 
@@ -1052,7 +1077,6 @@ def main_keyboard(imu, brace):
 
             command = KEY_MAP[key]
 
-            # Return to neutral if brace was compensating before executing command.
             if brace_was_active:
                 print("[BRACE] Returning to neutral before command...")
                 brace.reset()
@@ -1125,7 +1149,6 @@ def main():
         except Exception:
             pass
 
-    # Start watchdog AFTER hardware init — calibration must not trip it.
     watchdog_last_heartbeat[0] = time.time()
     threading.Thread(target=watchdog_thread, daemon=True).start()
 

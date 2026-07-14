@@ -17,7 +17,7 @@ pip install -r requirements.txt
 ## Run
 
 ```bash
-cd /home/a/quadruped/src/main/Parth/Dash
+cd /home/barq/quadruped/src/main/Parth/Dash
 python3 robot_dashboard.py
 ```
 

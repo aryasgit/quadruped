@@ -33,6 +33,26 @@ from hardware.absolute_truths import (
 # Internal state
 _initialized = False
 
+# I2C write robustness: the Tegra bus occasionally NAKs a servo write
+# (OSError errno 121, EREMOTEIO) under rapid mixed IMU-read/servo-write load.
+# These glitches are transient — a single retry almost always succeeds.
+# We retry a bounded number of times and only re-raise on a persistent fault,
+# so genuine wiring/power failures still surface instead of being hidden.
+_WRITE_RETRIES = 3
+_RETRY_DELAY_S = 0.001
+
+
+def _write_byte_retry(bus, addr, reg, value):
+    """write_byte_data with bounded retry on transient I2C NAKs (errno 121)."""
+    for attempt in range(_WRITE_RETRIES + 1):
+        try:
+            bus.write_byte_data(addr, reg, value)
+            return
+        except OSError:
+            if attempt >= _WRITE_RETRIES:
+                raise
+            time.sleep(_RETRY_DELAY_S)
+
 
 def init_pca():
     """
@@ -102,10 +122,10 @@ def set_servo_angle(channel: int, angle_deg: float):
     pulse = angle_to_pulse(angle_deg)
 
     base = 0x06 + 4 * channel
-    bus.write_byte_data(PCA_ADDR, base, 0x00)               # ON_L
-    bus.write_byte_data(PCA_ADDR, base + 1, 0x00)           # ON_H
-    bus.write_byte_data(PCA_ADDR, base + 2, pulse & 0xFF)   # OFF_L
-    bus.write_byte_data(PCA_ADDR, base + 3, (pulse >> 8))   # OFF_H
+    _write_byte_retry(bus, PCA_ADDR, base, 0x00)               # ON_L
+    _write_byte_retry(bus, PCA_ADDR, base + 1, 0x00)           # ON_H
+    _write_byte_retry(bus, PCA_ADDR, base + 2, pulse & 0xFF)   # OFF_L
+    _write_byte_retry(bus, PCA_ADDR, base + 3, (pulse >> 8))   # OFF_H
 
 
 # ---- Smoke test ----

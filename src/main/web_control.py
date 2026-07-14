@@ -35,6 +35,8 @@ import tty
 import termios
 import select
 from contextlib import contextmanager
+import socket
+from web_remote import WebControlHub
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -212,6 +214,15 @@ def watchdog_thread():
             recovery_requested.set()
             # Do NOT call os.execv — robot stays live, main loop handles it.
 
+def get_lan_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
 
 # =====================================================================
 # MATH / GAIT HELPERS
@@ -811,11 +822,229 @@ def run_stability_mode(imu, use_gamepad, controller, stance_z=STANCE_Z):
     # then calls reset_reference() to clean up state.
     print("[STABILITY] Stability mode deactivated.")
 
+def run_stability_mode_web(imu, web, stance_z=STANCE_Z):
+    print("\n[STABILITY] Stability mode ACTIVE — IMU posture control running.")
+    print(f"[STABILITY] Auto-exit after {MAX_STABILITY_TIME:.0f}s.")
+    print("[STABILITY] Press any button or move a stick to show exit prompt.")
+    print("[STABILITY] Then press P to confirm exit.")
+
+    reset_reference()
+    t_enter = time.time()
+
+    while True:
+        watchdog_last_heartbeat[0] = time.time()
+        loop_top = time.time()
+
+        if time.time() - t_enter > MAX_STABILITY_TIME:
+            print(f"\n[STABILITY] Auto-timeout after {MAX_STABILITY_TIME:.0f}s. Exiting.")
+            break
+
+        if imu is not None:
+            try:
+                physical = posture_step(stand_at_z(stance_z), imu)
+                send_to_servos(physical)
+            except Exception as e:
+                print(f"\n[WARN] Stability step error: {e}")
+                execute_step(stand_at_z(stance_z))
+        else:
+            execute_step(stand_at_z(stance_z))
+
+        # Browser input handling
+        if web.has_activity():
+            web.wait_for_idle()
+            print("\n[STABILITY] Input detected. Press P within 5s to confirm exit...")
+            t_wait = time.time()
+            confirmed = False
+
+            while time.time() - t_wait < 5.0:
+                execute_step(stand_at_z(stance_z))
+                cmd = web.poll_command()
+                if cmd == STABILITY_KEY:
+                    confirmed = True
+                    break
+                time.sleep(0.05)
+
+            if confirmed:
+                print("[STABILITY] Confirmed. Exiting stability mode.")
+                break
+            else:
+                print("[STABILITY] Not confirmed. Staying in stability mode.")
+
+        time.sleep(max(0, DT - (time.time() - loop_top)))
+
+    print("[STABILITY] Stability mode deactivated.")
 
 # =====================================================================
 # GAMEPAD MAIN LOOP
 # =====================================================================
 
+def main_web(imu, brace, web):
+    print("[INPUT] Web remote mode.")
+    print("[INFO] Open the phone browser at the shown URL.")
+    print("[INFO] P = stability mode, X = quit.")
+    print("Move: left stick = fwd/strafe, right stick = turn")
+    print("Buttons: 1-0 tricks, C height, W/A/S/D/Q/E single steps")
+    print("-" * 55)
+
+    height_index = 1
+    current_z = HEIGHT_MODES[height_index][1]
+    phase = 0.0
+    ramp_level = 0.0
+    moving = False
+    last_fwd = last_strafe = last_turn = 0.0
+
+    trick_runner = TrickRunner(brace)
+    brace_was_active = False
+
+    execute_step(stand_at_z(current_z))
+    time.sleep(0.5)
+    print("[INIT] Ready!\n")
+
+    try:
+        while True:
+            watchdog_last_heartbeat[0] = time.time()
+
+            if recovery_requested.is_set():
+                print("\n[WATCHDOG] In-place recovery: returning to stand...")
+                smooth_stand(current_z)
+                reset_reference()
+                phase = 0.0
+                ramp_level = 0.0
+                moving = False
+                recovery_requested.clear()
+                watchdog_last_heartbeat[0] = time.time()
+                continue
+
+            loop_top = time.time()
+
+            # Priority 1: queued button command from phone
+            cmd = web.poll_command()
+
+            if cmd == STABILITY_KEY:
+                saved_phase = phase
+                with BraceSuspended(brace):
+                    run_stability_mode_web(imu, web, current_z)
+
+                smooth_stand(current_z)
+                reset_reference()
+                phase = saved_phase
+                ramp_level = 0.0
+                moving = False
+                continue
+
+            if cmd is not None and cmd in KEY_MAP:
+                mapped = KEY_MAP[cmd]
+
+                if brace_was_active:
+                    print("[BRACE] Returning to neutral before command...")
+                    brace.reset()
+                    for _ in range(5):
+                        execute_step(stand_at_z(current_z))
+                        time.sleep(0.03)
+
+                if mapped == "quit":
+                    print("\n[QUIT] Exiting...")
+                    break
+
+                elif mapped == "height":
+                    old_z = current_z
+                    height_index = (height_index + 1) % len(HEIGHT_MODES)
+                    new_name, new_z = HEIGHT_MODES[height_index]
+                    print(f"  Height -> {new_name} (Z={new_z:.2f}m)")
+                    transition_height(old_z, new_z)
+                    current_z = new_z
+                    phase = 0.0
+                    ramp_level = 0.0
+                    moving = False
+
+                elif mapped in TRICK_MAP:
+                    trick_runner.run(mapped, current_z)
+                    moving = False
+                    ramp_level = 0.0
+                    phase = 0.0
+
+                else:
+                    # single-cycle movements
+                    execute_single_cycle(mapped, current_z)
+
+                time.sleep(0.1)
+                continue
+
+            # Priority 2: continuous analog sticks
+            fwd, strafe, turn = web.read_sticks()
+            mag = stick_magnitude(fwd, strafe, turn)
+
+            if mag > 0.01:
+                last_fwd, last_strafe, last_turn = fwd, strafe, turn
+                freq = lerp(ANALOG_FREQ_MIN, ANALOG_FREQ_MAX, mag)
+                step_scale = lerp(ANALOG_STEP_MIN, ANALOG_STEP_MAX, mag)
+                ramp_level = min(1.0, ramp_level + ANALOG_RAMP_UP * DT)
+                phase = wrap_phase(phase + freq * DT)
+
+                feet = apply_ramp(
+                    compute_feet_analog(phase, fwd, strafe, turn, step_scale, current_z),
+                    ramp_level,
+                    current_z,
+                )
+                execute_step(feet, strafe)
+                moving = True
+                brace_was_active = False
+
+                bar = int(mag * 10)
+                print(
+                    f"\r  ANALOG [{HEIGHT_MODES[height_index][0]}] "
+                    f"F:{fwd:+.2f} S:{strafe:+.2f} T:{turn:+.2f} "
+                    f"|{'|' * bar}{'.' * (10 - bar)}| "
+                    f"{freq:.1f}Hz ramp:{ramp_level:.0%}   ",
+                    end="",
+                    flush=True
+                )
+
+            elif moving:
+                ramp_level -= ANALOG_RAMP_DOWN * DT
+                if ramp_level <= RAMP_MIN:
+                    execute_step(stand_at_z(current_z))
+                    moving = False
+                    ramp_level = 0.0
+                    phase = 0.0
+                    print(f"\r  ANALOG [STAND]                                              ")
+                else:
+                    freq = lerp(ANALOG_FREQ_MIN, ANALOG_FREQ_MAX, 0.3)
+                    phase = wrap_phase(phase + freq * DT)
+                    feet = apply_ramp(
+                        compute_feet_analog(
+                            phase, last_fwd, last_strafe, last_turn,
+                            ANALOG_STEP_MIN, current_z
+                        ),
+                        ramp_level,
+                        current_z,
+                    )
+                    execute_step(feet, last_strafe)
+
+            else:
+                # idle: brace controller
+                if imu is not None:
+                    offsets = brace.update(imu)
+                    brace_was_active = brace.active
+                    brace_feet = {
+                        leg: (x, y, z + offsets[leg])
+                        for leg, (x, y, z) in stand_at_z(current_z).items()
+                    }
+                    execute_step(brace_feet)
+                else:
+                    execute_step(stand_at_z(current_z))
+                    brace_was_active = False
+
+            time.sleep(max(0, DT - (time.time() - loop_top)))
+
+    except KeyboardInterrupt:
+        print("\n[INTERRUPT] Caught Ctrl+C")
+    finally:
+        print("[SHUTDOWN] Returning to stand...")
+        execute_step(stand_at_z(STANCE_Z))
+        print("[SHUTDOWN] Done.")
+
+        
 def main_gamepad(controller, gamepad_name, imu, brace):
     print(f"[INPUT] Gamepad: {gamepad_name}")
     print("[INFO] Button 9 (Back/Select) = stability mode toggle.\n")
@@ -1094,7 +1323,7 @@ def main_keyboard(imu, brace):
 
 def main():
     print("=" * 55)
-    print("  SUPER CONTROLLER  (Main + Brace + Stability)")
+    print("  SUPER CONTROLLER  (Main + Brace + Stability + Web)")
     print("=" * 55)
 
     print("[INIT] PCA9685 servo driver...")
@@ -1110,29 +1339,18 @@ def main():
 
     brace = BraceController()
 
-    use_gamepad = False
-    controller = None
-    gamepad_name = ""
-    if pygame is not None:
-        try:
-            pygame.init()
-            pygame.joystick.init()
-            if pygame.joystick.get_count() > 0:
-                controller = pygame.joystick.Joystick(0)
-                controller.init()
-                use_gamepad = True
-                gamepad_name = controller.get_name()
-        except Exception:
-            pass
+    web = WebControlHub(deadzone=ANALOG_DEADZONE)
+    web.start(host="0.0.0.0", port=8000)
 
-    # Start watchdog AFTER hardware init — calibration must not trip it.
+    ip = get_lan_ip()
+    print(f"[WEB] Open this on your phone:")
+    print(f"[WEB] http://{ip}:8000")
+    print("[WEB] Keep the phone and Jetson on the same Wi-Fi network.")
+
     watchdog_last_heartbeat[0] = time.time()
     threading.Thread(target=watchdog_thread, daemon=True).start()
 
-    if use_gamepad:
-        main_gamepad(controller, gamepad_name, imu, brace)
-    else:
-        main_keyboard(imu, brace)
+    main_web(imu, brace, web)
 
 
 if __name__ == "__main__":

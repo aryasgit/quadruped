@@ -136,24 +136,24 @@ def shake():
     _transition(neutral, weight_left, duration=0.5)
     time.sleep(0.2)
 
-    # step 2: lift FR paw up and forward
+    # step 2: lift FR paw up and farther forward (more thigh-forward reach)
     offer = dict(weight_left)
-    offer["FR"] = (0.05, -STANCE_Y + 0.02, STANCE_Z + 0.07)  # lift up & forward
-    _transition(weight_left, offer, duration=0.5)
+    offer["FR"] = (0.085, -STANCE_Y + 0.02, STANCE_Z + 0.07)
+    _transition(weight_left, offer, duration=0.65)
 
-    # hold for handshake
+    # Minimal hold before starting handshake motion.
     print("   (waiting for handshake...)")
-    time.sleep(2.0)
+    time.sleep(0.20)
 
-    # up-down shake motion — larger amplitude for visibility
+    # Slow up-down shake driven only by wrist axis (keep FR x/y fixed; no coxa sweep).
     for _ in range(3):
         up = dict(offer)
-        up["FR"] = (0.07, -STANCE_Y + 0.01, STANCE_Z + 0.10)  # higher & more forward
-        _transition(offer, up, duration=0.15)
+        up["FR"] = (offer["FR"][0], offer["FR"][1], STANCE_Z + 0.115)
+        _transition(offer, up, duration=0.34)
         down = dict(offer)
-        down["FR"] = (0.03, -STANCE_Y + 0.03, STANCE_Z + 0.05)  # lower & back
-        _transition(up, down, duration=0.15)
-        _transition(down, offer, duration=0.15)
+        down["FR"] = (offer["FR"][0], offer["FR"][1], STANCE_Z + 0.050)
+        _transition(up, down, duration=0.34)
+        _transition(down, offer, duration=0.30)
 
     # step 3: lower paw back to weight-shifted position first
     _transition(offer, weight_left, duration=0.5)
@@ -172,16 +172,33 @@ def bow():
     neutral = _neutral_feet()
 
     bowed = dict(neutral)
-    # front legs retract (body drops at front) — FL gets less drop and less forward shift
-    bowed["FL"] = (0.015,  STANCE_Y, STANCE_Z + 0.033)
-    bowed["FR"] = (0.03, -STANCE_Y, STANCE_Z + 0.04)
-    # rear legs extend slightly (body stays up at rear)
-    bowed["RL"] = (-0.01,  STANCE_Y, STANCE_Z - 0.015)
-    bowed["RR"] = (-0.01, -STANCE_Y, STANCE_Z - 0.015)
+    # Deeper front bow with stronger front drop and rear extension.
+    bowed["FL"] = (0.020,  STANCE_Y, STANCE_Z + 0.060)
+    bowed["FR"] = (0.020, -STANCE_Y, STANCE_Z + 0.060)
+    bowed["RL"] = (-0.015,  STANCE_Y, STANCE_Z - 0.022)
+    bowed["RR"] = (-0.015, -STANCE_Y, STANCE_Z - 0.022)
 
-    _transition(neutral, bowed, duration=0.8)
-    time.sleep(1.0)
-    _transition(bowed, neutral, duration=0.8)
+    _transition(neutral, bowed, duration=0.9)
+
+    # Slow "nodding" motion while bowed: tiny pitch oscillation to look natural.
+    nod_down = dict(bowed)
+    nod_down["FL"] = (0.020,  STANCE_Y, STANCE_Z + 0.068)
+    nod_down["FR"] = (0.020, -STANCE_Y, STANCE_Z + 0.068)
+    nod_down["RL"] = (-0.015,  STANCE_Y, STANCE_Z - 0.026)
+    nod_down["RR"] = (-0.015, -STANCE_Y, STANCE_Z - 0.026)
+
+    nod_up = dict(bowed)
+    nod_up["FL"] = (0.020,  STANCE_Y, STANCE_Z + 0.053)
+    nod_up["FR"] = (0.020, -STANCE_Y, STANCE_Z + 0.053)
+    nod_up["RL"] = (-0.015,  STANCE_Y, STANCE_Z - 0.018)
+    nod_up["RR"] = (-0.015, -STANCE_Y, STANCE_Z - 0.018)
+
+    for _ in range(2):
+        _transition(bowed, nod_down, duration=0.65)
+        _transition(nod_down, nod_up, duration=0.75)
+        _transition(nod_up, bowed, duration=0.65)
+
+    _transition(bowed, neutral, duration=0.9)
 
 
 # ================================================================
@@ -254,8 +271,8 @@ def bheek():
     look_l = dict(neutral)
     look_l["FL"] = (-0.085,  STANCE_Y, STANCE_Z)   # was -0.06, now -0.085
     look_l["FR"] = (-0.085, -STANCE_Y, STANCE_Z)   # was -0.06, now -0.085
-    look_l["RL"] = (0.04,  STANCE_Y, STANCE_Z)     # was 0.03, now 0.04
-    look_l["RR"] = (0.04, -STANCE_Y, STANCE_Z)     # was 0.03, now 0.04
+    look_l["RL"] = (0.04,  STANCE_Y, STANCE_Z + 0.020)  # extra rear wrist bend for stable sit-back
+    look_l["RR"] = (0.04, -STANCE_Y, STANCE_Z + 0.020)  # extra rear wrist bend for stable sit-back
 
     _transition(neutral, look_l, duration=0.4)    # was 0.6, now 0.4 (faster for momentum)
     time.sleep(1.5)  # wait for robot to settle on rear legs
@@ -329,8 +346,8 @@ def high_five():
     reared = dict(neutral)
     reared["FL"] = (-0.085,  STANCE_Y, STANCE_Z)
     reared["FR"] = (-0.085, -STANCE_Y, STANCE_Z)
-    reared["RL"] = (0.04,  STANCE_Y, STANCE_Z)
-    reared["RR"] = (0.04, -STANCE_Y, STANCE_Z)
+    reared["RL"] = (0.04,  STANCE_Y, STANCE_Z + 0.020)
+    reared["RR"] = (0.04, -STANCE_Y, STANCE_Z + 0.020)
 
     _transition(neutral, reared, duration=0.4)
     time.sleep(1.0)  # settle on rear legs
@@ -392,12 +409,12 @@ def sit():
     neutral = _neutral_feet()
 
     sitting = dict(neutral)
-    # rear legs retract (body drops at rear)
-    sitting["RL"] = (-0.02,  STANCE_Y, STANCE_Z + 0.05)
-    sitting["RR"] = (-0.02, -STANCE_Y, STANCE_Z + 0.05)
-    # front legs extend slightly (body stays up at front)
-    sitting["FL"] = (0.01,  STANCE_Y, STANCE_Z - 0.015)
-    sitting["FR"] = (0.01, -STANCE_Y, STANCE_Z - 0.015)
+    # Rear thighs should not travel too far back, but rear wrists fold inward more.
+    sitting["RL"] = (-0.042,  STANCE_Y, STANCE_Z + 0.092)
+    sitting["RR"] = (-0.042, -STANCE_Y, STANCE_Z + 0.092)
+    # Front thighs/wrists move back more to keep the sit balanced and compact.
+    sitting["FL"] = (-0.010,  STANCE_Y, STANCE_Z - 0.010)
+    sitting["FR"] = (-0.010, -STANCE_Y, STANCE_Z - 0.010)
 
     _transition(neutral, sitting, duration=1.0)
     time.sleep(2.0)
@@ -408,29 +425,63 @@ def sit():
 #  TRICK 8: STRETCH
 # ================================================================
 def stretch():
-    """Morning stretch — front goes down, rear extends back."""
-    print("🐕‍🦺 Stretch!")
+    """Front-wrist handstand with synchronized rear-leg air motion and smooth landing."""
+    print("🤸 Handstand!")
     neutral = _neutral_feet()
 
-    stretched = dict(neutral)
-    # front drops and pushes forward
-    stretched["FL"] = (0.04,  STANCE_Y, STANCE_Z - 0.04)
-    stretched["FR"] = (0.04, -STANCE_Y, STANCE_Z - 0.04)
-    # rear pushes back and lifts slightly
-    stretched["RL"] = (-0.03,  STANCE_Y, STANCE_Z + 0.01)
-    stretched["RR"] = (-0.03, -STANCE_Y, STANCE_Z + 0.01)
+    # Step 1: whole-body tilt forward until front wrists are fully closed.
+    tilt_front = dict(neutral)
+    tilt_front["FL"] = (0.030,  STANCE_Y, STANCE_Z + 0.125)
+    tilt_front["FR"] = (0.030, -STANCE_Y, STANCE_Z + 0.125)
+    tilt_front["RL"] = (0.015,  STANCE_Y, STANCE_Z + 0.035)
+    tilt_front["RR"] = (0.015, -STANCE_Y, STANCE_Z + 0.035)
+    _transition(neutral, tilt_front, duration=1.05)
 
-    _transition(neutral, stretched, duration=1.0)
-    time.sleep(1.5)
+    # Step 2: compress the rear legs to load energy before the launch.
+    rear_compress = dict(tilt_front)
+    rear_compress["RL"] = (0.035,  STANCE_Y, STANCE_Z + 0.020)
+    rear_compress["RR"] = (0.035, -STANCE_Y, STANCE_Z + 0.020)
+    _transition(tilt_front, rear_compress, duration=0.40)
 
-    # optional: deeper stretch
-    deeper = dict(stretched)
-    deeper["FL"] = (0.05,  STANCE_Y, STANCE_Z - 0.05)
-    deeper["FR"] = (0.05, -STANCE_Y, STANCE_Z - 0.05)
-    _transition(stretched, deeper, duration=0.5)
-    time.sleep(1.0)
+    # Step 3: explosive rear-leg push (rear wrists back fast) while front thighs drive forward.
+    handstand = dict(rear_compress)
+    handstand["FL"] = (0.080,  STANCE_Y, STANCE_Z + 0.060)
+    handstand["FR"] = (0.080, -STANCE_Y, STANCE_Z + 0.060)
+    handstand["RL"] = (-0.100,  STANCE_Y, STANCE_Z + 0.132)
+    handstand["RR"] = (-0.100, -STANCE_Y, STANCE_Z + 0.132)
+    _transition(rear_compress, handstand, duration=0.12)
 
-    _transition(deeper, neutral, duration=1.0)
+    # Step 4: handstand demo — move rear legs slowly and in sync while in the air.
+    rear_high = dict(handstand)
+    rear_high["RL"] = (-0.098,  STANCE_Y, STANCE_Z + 0.146)
+    rear_high["RR"] = (-0.098, -STANCE_Y, STANCE_Z + 0.146)
+
+    rear_low = dict(handstand)
+    rear_low["RL"] = (-0.080,  STANCE_Y, STANCE_Z + 0.118)
+    rear_low["RR"] = (-0.080, -STANCE_Y, STANCE_Z + 0.118)
+
+    hold = dict(handstand)
+    for _ in range(3):
+        _transition(hold, rear_high, duration=0.55)
+        _transition(rear_high, rear_low, duration=0.60)
+        hold = rear_low
+    _transition(hold, handstand, duration=0.45)
+
+    # Step 5: recover by bringing front thighs back first, then land and stand.
+    front_back = dict(handstand)
+    front_back["FL"] = (-0.040,  STANCE_Y, STANCE_Z + 0.065)
+    front_back["FR"] = (-0.040, -STANCE_Y, STANCE_Z + 0.065)
+    front_back["RL"] = (-0.072,  STANCE_Y, STANCE_Z + 0.108)
+    front_back["RR"] = (-0.072, -STANCE_Y, STANCE_Z + 0.108)
+    _transition(handstand, front_back, duration=0.60)
+
+    landing = dict(neutral)
+    landing["FL"] = (-0.015,  STANCE_Y, STANCE_Z + 0.040)
+    landing["FR"] = (-0.015, -STANCE_Y, STANCE_Z + 0.040)
+    landing["RL"] = (-0.025,  STANCE_Y, STANCE_Z + 0.045)
+    landing["RR"] = (-0.025, -STANCE_Y, STANCE_Z + 0.045)
+    _transition(front_back, landing, duration=0.65)
+    _transition(landing, neutral, duration=0.85)
 
 
 # ================================================================
@@ -514,7 +565,7 @@ TRICKS = {
     "bheek":      (bheek,       "Stand on rear legs and pan"),
     "high_five":   (high_five,   "Rear up and offer paw for high-five"),
     "sit":         (sit,         "Sit like a dog"),
-    "stretch":     (stretch,     "Morning stretch"),
+    "stretch":     (stretch,     "Front-wrist handstand with smooth landing"),
     "tilt_dance":  (tilt_dance,  "Roll side to side"),
     "combo":       (combo,       "Chain all tricks together"),
 }

@@ -84,11 +84,11 @@ LEGS = ("FL", "FR", "RL", "RR")
 # Lower to 5 if still too insensitive; raise if you get false
 # triggers during normal walking.
 
-ROLL_SHOVE_THRESHOLD  = 16.0    # deg/s — less sensitive
-PITCH_SHOVE_THRESHOLD = 12.0    # deg/s — less sensitive
+ROLL_SHOVE_THRESHOLD  = 20.0    # deg/s — low-sensitivity profile
+PITCH_SHOVE_THRESHOLD = 15.0    # deg/s — low-sensitivity profile
 
-ROLL_EXIT_THRESHOLD   = 8.0     # deg/s — exit
-PITCH_EXIT_THRESHOLD  = 6.0     # deg/s — exit
+ROLL_EXIT_THRESHOLD   = 10.0    # deg/s — wider hysteresis
+PITCH_EXIT_THRESHOLD  = 8.0     # deg/s — wider hysteresis
 
 # --- Baseline extraction ---------------------------------------------
 #
@@ -100,7 +100,7 @@ PITCH_EXIT_THRESHOLD  = 6.0     # deg/s — exit
 # After a 2.5s sustained turn the baseline absorbs it.
 # A 200ms shove barely moves the baseline (~8% absorbed).
 
-BASELINE_ALPHA = 0.008
+BASELINE_ALPHA = 0.012
 
 # --- Response: DIRECT PROPORTIONAL -----------------------------------
 #
@@ -111,8 +111,8 @@ BASELINE_ALPHA = 0.008
 #   Medium push  ~30 deg/s → 0.0012 × 30 = 0.036m = 36mm  ← strong brace
 #   Hard shove   ~60 deg/s → 0.0012 × 60 = 0.072m → clamped to 40mm
 
-ROLL_GAIN  = 0.0007     # m per deg/s — less aggressive
-PITCH_GAIN = 0.0006     # m per deg/s — less aggressive
+ROLL_GAIN  = 0.0005     # m per deg/s — softer response
+PITCH_GAIN = 0.00045    # m per deg/s — softer response
 
 # --- Attack smoothing ------------------------------------------------
 #
@@ -126,19 +126,19 @@ PITCH_GAIN = 0.0006     # m per deg/s — less aggressive
 #   3 ticks (60ms): 87.5%
 #   5 ticks (100ms): 97%
 
-ATTACK_RATE = 10.0      # 1/s — slower approach to target
+ATTACK_RATE = 7.0       # 1/s — further reduced to avoid jerk loops
 
 # --- Decay -----------------------------------------------------------
 #
 # Exponential return to zero when shove ends (residual < exit threshold).
 # Half-life = ln(2) / DECAY_RATE ≈ 0.693 / 5.0 ≈ 139ms
 
-DECAY_RATE = 5.0        # 1/s
+DECAY_RATE = 6.5        # 1/s — bleed off residual correction faster
 
 # --- Limits ----------------------------------------------------------
 
 MAX_DZ = 0.040          # max correction per leg (m) — 40mm, within IK workspace
-MIN_DZ = 0.0012         # larger deadband to suppress micro-vibrations
+MIN_DZ = 0.0018         # stronger deadband against post-walk chatter
 
 # --- Timing ----------------------------------------------------------
 
