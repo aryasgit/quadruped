@@ -1,0 +1,8 @@
+# Runtime dependencies for the locked web-control stack.
+# Install into a venv:  pip install -r requirements.txt
+fastapi
+uvicorn[standard]
+smbus2
+numpy
+# pygame is optional (gamepad support); the stack runs without it.
+pygame

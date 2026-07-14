@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quadruped Controller</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: system-ui;
+  background: #0f1115;
+  color: #fff;
+
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+/* HEADER */
+.topbar {
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  background: #171a21;
+}
+
+.status {
+  color: #ef4444;
+}
+.status.connected {
+  color: #31c48d;
+}
+
+/* TABS */
+.tabs {
+  display: flex;
+}
+
+.tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  background: #1e2230;
+  border: none;
+  color: white;
+  font-weight: bold;
+}
+
+.tab.active {
+  background: #6ea8ff;
+}
+
+/* VIEWS */
+.view {
+  display: none;
+  height: calc(100vh - 90px);
+}
+
+.view.active {
+  display: flex;
+}
+
+/* ANALOG */
+.analog {
+  justify-content: space-around;
+  align-items: center;
+}
+
+.joystick {
+  width: 45vw;
+  height: 45vw;
+  max-width: 320px;
+  max-height: 320px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  position: relative;
+
+  touch-action: none;
+}
+
+.stick {
+  width: 90px;
+  height: 90px;
+  background: rgba(110,168,255,0.35);
+  border-radius: 50%;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin-left: -45px;
+  margin-top: -45px;
+
+  pointer-events: none;
+}
+
+/* COMMANDS */
+.commands {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+button {
+  padding: 18px 10px;
+  font-size: 18px;
+  border-radius: 12px;
+  border: none;
+  background: #242a39;
+  color: white;
+}
+
+button:active {
+  background: #6ea8ff;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div>Quadruped Controller</div>
+  <div id="status" class="status">disconnected</div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchView(event, 'analog')">🎮 Analog</button>
+  <button class="tab" onclick="switchView(event, 'cmd')">🎯 Commands</button>
+</div>
+
+<!-- ANALOG -->
+<div id="analog" class="view active analog">
+  <div class="joystick" id="left">
+    <div class="stick"></div>
+  </div>
+  <div class="joystick" id="right">
+    <div class="stick"></div>
+  </div>
+</div>
+
+<!-- COMMANDS -->
+<div id="cmd" class="view commands">
+  <button data-cmd="1">1</button>
+  <button data-cmd="2">2</button>
+  <button data-cmd="3">3</button>
+  <button data-cmd="4">4</button>
+  <button data-cmd="5">5</button>
+  <button data-cmd="6">6</button>
+  <button data-cmd="7">7</button>
+  <button data-cmd="8">8</button>
+  <button data-cmd="9">9</button>
+  <button data-cmd="0">0</button>
+
+  <button data-cmd="c">C</button>
+  <button data-cmd="p">P</button>
+
+  <button data-cmd="w">W</button>
+  <button data-cmd="s">S</button>
+  <button data-cmd="a">A</button>
+  <button data-cmd="d">D</button>
+  <button data-cmd="q">Q</button>
+  <button data-cmd="e">E</button>
+
+  <button data-cmd="x">X</button>
+</div>
+
+<script>
+const statusEl = document.getElementById("status");
+const ws = new WebSocket(`ws://${location.host}/ws`);
+
+let axes = { fwd:0, strafe:0, turn:0 };
+
+ws.onopen = () => {
+  statusEl.textContent = "connected";
+  statusEl.classList.add("connected");
+};
+
+ws.onclose = () => {
+  statusEl.textContent = "disconnected";
+  statusEl.classList.remove("connected");
+};
+
+function send(obj){
+  if(ws.readyState===1){
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+/* TAB SWITCH */
+function switchView(e, id){
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+
+  document.getElementById(id).classList.add("active");
+  e.target.classList.add("active");
+}
+
+/* BUTTONS */
+document.querySelectorAll("[data-cmd]").forEach(btn=>{
+  btn.onclick = ()=>{
+    send({type:"command", cmd:btn.dataset.cmd});
+  };
+});
+
+/* JOYSTICK */
+function makeJoy(el, type){
+  const stick = el.querySelector(".stick");
+  let active = false;
+
+  function update(e){
+    const r = el.getBoundingClientRect();
+
+    let dx = (e.clientX - (r.left+r.width/2)) / (r.width/2);
+    let dy = (e.clientY - (r.top+r.height/2)) / (r.height/2);
+
+    dx = Math.max(-1, Math.min(1, dx));
+    dy = Math.max(-1, Math.min(1, dy));
+
+    stick.style.transform = `translate(${dx*80}px, ${dy*80}px)`;
+
+    if(type==="left"){
+      axes.fwd = -dy;
+      axes.strafe = dx;
+    } else {
+      axes.turn = dx;
+    }
+
+    send({type:"axis", ...axes});
+  }
+
+  el.addEventListener("pointerdown", (e)=>{
+    active = true;
+    el.setPointerCapture(e.pointerId);
+    update(e);
+  });
+
+  el.addEventListener("pointermove", (e)=>{
+    if(!active) return;
+    update(e);
+  });
+
+  function stop(){
+    active = false;
+    stick.style.transform = "translate(0,0)";
+    axes = {fwd:0, strafe:0, turn:0};
+    send({type:"axis", ...axes});
+  }
+
+  el.addEventListener("pointerup", stop);
+  el.addEventListener("pointercancel", stop);
+  el.addEventListener("lostpointercapture", stop);
+}
+
+/* PREVENT SCROLL HARD */
+document.body.addEventListener("touchmove", e => {
+  e.preventDefault();
+}, { passive:false });
+
+makeJoy(document.getElementById("left"), "left");
+makeJoy(document.getElementById("right"), "right");
+
+/* HEARTBEAT */
+setInterval(()=>{
+  send({type:"ping"});
+}, 100);
+</script>
+
+</body>
+</html>
