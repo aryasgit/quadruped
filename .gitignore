@@ -22,3 +22,7 @@ Thumbs.db
 venv/
 .env
 run_log.csv
+
+# Runtime telemetry logs
+src/main/logs/
+*.jsonl
