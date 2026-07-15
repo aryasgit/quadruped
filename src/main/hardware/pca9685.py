@@ -1,58 +1,138 @@
+# hardware/pca9685.py
 """
-L1 — PCA9685 SERVO DRIVER
-=========================
+Layer 1.2 — PCA9685 SERVO DRIVER
+===============================
 
-Angle (physical servo degrees) -> PWM pulse -> bus write. All I2C goes through
-the locked, guarded hardware.bus. No leg/gait/IK knowledge.
+Authoritative low-level driver for PCA9685.
+
+Responsibilities:
+- Initialize PCA9685 at 50 Hz
+- Convert mechanical angle (degrees) -> PWM pulse
+- Write pulse to PCA channel
+
+NON-RESPONSIBILITIES:
+- No leg semantics
+- No gait logic
+- No IK
+- No balance
+- No timing loops
+
+This driver trusts Layer 0 for all electrical and mechanical truths.
 """
 
 import time
-
-from config.robot_spec import (
-    PCA_ADDR, PCA_MODE1, PCA_PRESCALE, PWM_FREQ_HZ,
-    PULSE_MIN, PULSE_MAX, SERVO_TRAVEL_DEG, CHANNEL,
+from hardware.i2c_bus import get_i2c_bus
+from hardware.absolute_truths import (
+    PCA_ADDR,
+    MODE1,
+    PRESCALE,
+    PULSE_MIN,
+    PULSE_MAX,
 )
-from hardware import bus
 
+# Internal state
 _initialized = False
 
+# I2C write robustness: the Tegra bus occasionally NAKs a servo write
+# (OSError errno 121, EREMOTEIO) under rapid mixed IMU-read/servo-write load.
+# These glitches are transient — a single retry almost always succeeds.
+# We retry a bounded number of times and only re-raise on a persistent fault,
+# so genuine wiring/power failures still surface instead of being hidden.
+_WRITE_RETRIES = 3
+_RETRY_DELAY_S = 0.001
 
-def init():
-    """Configure the PCA9685 for servo PWM. Idempotent."""
+
+def _write_byte_retry(bus, addr, reg, value):
+    """write_byte_data with bounded retry on transient I2C NAKs (errno 121)."""
+    for attempt in range(_WRITE_RETRIES + 1):
+        try:
+            bus.write_byte_data(addr, reg, value)
+            return
+        except OSError:
+            if attempt >= _WRITE_RETRIES:
+                raise
+            time.sleep(_RETRY_DELAY_S)
+
+
+def init_pca():
+    """
+    Initialize PCA9685 for 50 Hz servo operation.
+    This must be called once at startup.
+    """
     global _initialized
     if _initialized:
         return
-    prescale = int(round(25_000_000.0 / (4096 * PWM_FREQ_HZ) - 1))
-    bus.write_byte(PCA_ADDR, PCA_MODE1, 0x00)
+
+    bus = get_i2c_bus()
+
+    # Reset
+    bus.write_byte_data(PCA_ADDR, MODE1, 0x00)
     time.sleep(0.01)
-    bus.write_byte(PCA_ADDR, PCA_MODE1, 0x10)          # sleep
-    bus.write_byte(PCA_ADDR, PCA_PRESCALE, prescale)   # set frame rate
-    bus.write_byte(PCA_ADDR, PCA_MODE1, 0x00)          # wake
-    time.sleep(0.005)
-    bus.write_byte(PCA_ADDR, PCA_MODE1, 0x80)          # restart
-    time.sleep(0.005)
+
+    # Set prescale for 50 Hz
+    prescale = int(25_000_000 / (4096 * 50) - 1)
+
+    bus.write_byte_data(PCA_ADDR, MODE1, 0x10)      # sleep
+    bus.write_byte_data(PCA_ADDR, PRESCALE, prescale)
+    bus.write_byte_data(PCA_ADDR, MODE1, 0x00)      # wake
+    bus.write_byte_data(PCA_ADDR, MODE1, 0x80)      # restart
+
+    time.sleep(0.01)
     _initialized = True
 
 
-def angle_to_pulse(angle_deg):
-    a = 0.0 if angle_deg < 0 else SERVO_TRAVEL_DEG if angle_deg > SERVO_TRAVEL_DEG else angle_deg
-    pulse = int(round(PULSE_MIN + (a / SERVO_TRAVEL_DEG) * (PULSE_MAX - PULSE_MIN)))
-    return max(PULSE_MIN, min(PULSE_MAX, pulse))
+# ----------------------------
+# Angle → PWM conversion
+# ----------------------------
+
+def angle_to_pulse(angle_deg: float) -> int:
+    """
+    Convert a mechanical angle in degrees to PCA9685 pulse value.
+
+    Assumes servo travel is 270° (as per Layer 0 truth).
+    Clamps to electrical limits.
+    """
+    if angle_deg < 0:
+        angle_deg = 0.0
+    elif angle_deg > 270:
+        angle_deg = 270.0
+
+    pulse = int(PULSE_MIN + (angle_deg / 270.0) * (PULSE_MAX - PULSE_MIN))
+
+    if pulse < PULSE_MIN:
+        pulse = PULSE_MIN
+    elif pulse > PULSE_MAX:
+        pulse = PULSE_MAX
+
+    return pulse
 
 
-def set_channel(channel, angle_deg):
+# ----------------------------
+# Output primitive
+# ----------------------------
+
+def set_servo_angle(channel: int, angle_deg: float):
+    """
+    Set a single PCA9685 channel to a mechanical angle (degrees).
+    """
     if not _initialized:
-        init()
+        init_pca()
+
+    bus = get_i2c_bus()
     pulse = angle_to_pulse(angle_deg)
+
     base = 0x06 + 4 * channel
-    bus.write_byte(PCA_ADDR, base, 0x00)               # ON_L
-    bus.write_byte(PCA_ADDR, base + 1, 0x00)           # ON_H
-    bus.write_byte(PCA_ADDR, base + 2, pulse & 0xFF)   # OFF_L
-    bus.write_byte(PCA_ADDR, base + 3, (pulse >> 8) & 0x0F)  # OFF_H
+    _write_byte_retry(bus, PCA_ADDR, base, 0x00)               # ON_L
+    _write_byte_retry(bus, PCA_ADDR, base + 1, 0x00)           # ON_H
+    _write_byte_retry(bus, PCA_ADDR, base + 2, pulse & 0xFF)   # OFF_L
+    _write_byte_retry(bus, PCA_ADDR, base + 3, (pulse >> 8))   # OFF_H
 
 
-def apply_pose(servo_degrees):
-    """servo_degrees: {joint_name: physical degrees}. Writes all mapped joints."""
-    for joint, ch in CHANNEL.items():
-        if joint in servo_degrees:
-            set_channel(ch, servo_degrees[joint])
+# ---- Smoke test ----
+if __name__ == "__main__":
+    print("[PCA] Initializing...")
+    init_pca()
+    print("[PCA] Sweeping channel 0")
+    for a in (0, 90, 180, 270, 180, 90):
+        set_servo_angle(0, a)
+        time.sleep(0.5)
