@@ -26,3 +26,6 @@ run_log.csv
 # Runtime telemetry logs
 src/main/logs/
 *.jsonl
+
+# TLS certs (self-signed, machine-local)
+src/main/certs/
