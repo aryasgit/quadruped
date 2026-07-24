@@ -13,6 +13,7 @@ import uvicorn
 
 ANALOG_DEADZONE = 0.15
 STALE_TIMEOUT = 0.40
+TILT_STALE_TIMEOUT = 0.50   # phone gyro tilt decays to 0 if updates stop
 
 
 def apply_deadzone(value: float, deadzone: float = ANALOG_DEADZONE) -> float:
@@ -30,6 +31,12 @@ class RemoteState:
     last_update: float = 0.0
     connected: bool = False
     commands: deque = field(default_factory=deque)
+    # Phone/tablet gyro tilt, each in [-1, 1].
+    #   tilt_roll  : + = lean right   (side to side)
+    #   tilt_pitch : + = nose down    (front to back)
+    tilt_roll: float = 0.0
+    tilt_pitch: float = 0.0
+    tilt_update: float = 0.0
 
 
 class WebControlHub:
@@ -46,6 +53,7 @@ class WebControlHub:
 
     def __init__(self, deadzone: float = ANALOG_DEADZONE):
         self.deadzone = deadzone
+        self.scheme = "http"   # set to "https" by start() when a TLS cert exists
         self._lock = Lock()
         self._state = RemoteState()
 
@@ -72,6 +80,19 @@ class WebControlHub:
     def flush_commands(self):
         with self._lock:
             self._state.commands.clear()
+
+    def set_tilt(self, roll: float, pitch: float):
+        with self._lock:
+            self._state.tilt_roll = max(-1.0, min(1.0, float(roll)))
+            self._state.tilt_pitch = max(-1.0, min(1.0, float(pitch)))
+            self._state.tilt_update = time.time()
+
+    def get_tilt(self):
+        """Latest phone gyro (roll, pitch) in [-1, 1]; (0, 0) if stale/disabled."""
+        with self._lock:
+            if time.time() - self._state.tilt_update > TILT_STALE_TIMEOUT:
+                return 0.0, 0.0
+            return self._state.tilt_roll, self._state.tilt_pitch
 
     def set_connected(self, connected: bool):
         with self._lock:
@@ -119,13 +140,20 @@ class WebControlHub:
     def start(self, host: str = "0.0.0.0", port: int = 8000):
         app = self._build_app()
 
-        config = uvicorn.Config(
-            app=app,
-            host=host,
-            port=port,
-            log_level="warning",
-            access_log=False,
-        )
+        # Serve over HTTPS if a self-signed cert is present. Mobile browsers only
+        # expose device-orientation (gyro) sensors on a secure context, so the
+        # phone-tilt feature needs TLS. Falls back to plain HTTP if no cert.
+        cert_dir = Path(__file__).with_name("certs")
+        certfile = cert_dir / "cert.pem"
+        keyfile = cert_dir / "key.pem"
+        use_tls = certfile.exists() and keyfile.exists()
+        self.scheme = "https" if use_tls else "http"
+
+        cfg = dict(app=app, host=host, port=port, log_level="warning", access_log=False)
+        if use_tls:
+            cfg["ssl_certfile"] = str(certfile)
+            cfg["ssl_keyfile"] = str(keyfile)
+        config = uvicorn.Config(**cfg)
         server = uvicorn.Server(config)
 
         # BUG FIX: surface server startup failures. The old code ran server.run
@@ -187,6 +215,8 @@ class WebControlHub:
                         )
                     elif msg_type == "command":
                         self.push_command(str(data.get("cmd", "")).lower())
+                    elif msg_type == "tilt":
+                        self.set_tilt(data.get("roll", 0.0), data.get("pitch", 0.0))
                     elif msg_type == "ping":
                         self.set_connected(True)
 

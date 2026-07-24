@@ -88,6 +88,13 @@
   button.warn:active{background:var(--warn); border-color:var(--warn);}
   button.danger{background:#2a1a1e; border-color:#5b2b30; color:#ffb4b4;}
   button.danger:active{background:var(--danger); border-color:var(--danger); color:#fff;}
+
+  .tiltbtn{margin:6px 8px 2px; padding:14px; width:calc(100% - 16px); border-radius:14px;
+    border:1px solid var(--line); background:var(--panel2); color:var(--txt);
+    font-size:15px; font-weight:600; display:flex; flex-direction:column; gap:3px; align-items:center;}
+  .tiltbtn .hint{font-size:11px; color:var(--dim); font-weight:500;}
+  .tiltbtn.on{background:linear-gradient(90deg,#173a2c,#1c4a38); border-color:var(--accent2); color:#c9ffe8;}
+  .tiltbtn.on .hint{color:#8fe6c2;}
 </style>
 </head>
 <body>
@@ -119,6 +126,7 @@
     <div>strafe <b id="rStrafe">0.00</b></div>
     <div>turn <b id="rTurn">0.00</b></div>
   </div>
+  <button id="tiltBtn" class="tiltbtn">📱 Gyro Tilt: OFF <span class="hint">tilt any direction · stationary only</span></button>
 </div>
 
 <!-- ACTIONS -->
@@ -172,7 +180,8 @@ function setStatus(cls, text){ statusEl.className = "status " + cls; statusText.
 
 function connect(){
   setStatus("reconnecting", "connecting…");
-  ws = new WebSocket(`ws://${location.host}/ws`);
+  const wsProto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${wsProto}://${location.host}/ws`);
   ws.onopen  = () => setStatus("connected", "connected");
   ws.onclose = () => { setStatus("reconnecting", "reconnecting…"); setTimeout(connect, 1000); };
   ws.onerror = () => { try{ ws.close(); }catch(e){} };
@@ -236,6 +245,55 @@ function makeJoy(el, type){
 }
 makeJoy(document.getElementById("left"), "left");
 makeJoy(document.getElementById("right"), "right");
+
+/* --- gyro tilt: mirror phone side-to-side (roll) onto the robot when idle --- */
+const tiltBtn = document.getElementById("tiltBtn");
+const TILT_MAX_DEG = 30;          // phone tilt (deg) that maps to full lean
+let tiltOn = false, tiltTimer = null;
+let curRoll = 0, curPitch = 0, refG = null, refB = null;
+
+function onOrient(e){
+  // gamma = left/right tilt (roll), beta = front/back tilt (pitch), degrees.
+  const g = e.gamma || 0, b = e.beta || 0;
+  if(refG === null){ refG = g; refB = b; }        // first reading becomes "level"
+  curRoll  = Math.max(-1, Math.min(1, (g - refG) / TILT_MAX_DEG));   // + = right
+  curPitch = Math.max(-1, Math.min(1, (b - refB) / TILT_MAX_DEG));   // + = nose down
+}
+
+async function enableTilt(){
+  // iOS 13+ needs an explicit permission request from a user gesture
+  if(typeof DeviceOrientationEvent !== "undefined" &&
+     typeof DeviceOrientationEvent.requestPermission === "function"){
+    try{
+      const res = await DeviceOrientationEvent.requestPermission();
+      if(res !== "granted"){ alert("Motion access denied — can't use gyro tilt."); return false; }
+    }catch(err){ alert("Motion access error: " + err); return false; }
+  }
+  refG = refB = null;             // recapture neutral each time it's enabled
+  window.addEventListener("deviceorientation", onOrient);
+  tiltTimer = setInterval(()=> send({type:"tilt", roll: curRoll, pitch: curPitch}), 40);  // ~25 Hz
+  return true;
+}
+function disableTilt(){
+  window.removeEventListener("deviceorientation", onOrient);
+  if(tiltTimer){ clearInterval(tiltTimer); tiltTimer = null; }
+  curRoll = curPitch = 0;
+  send({type:"tilt", roll: 0, pitch: 0});
+}
+tiltBtn.addEventListener("click", async ()=>{
+  if(!tiltOn){
+    const ok = await enableTilt();
+    if(!ok) return;
+    tiltOn = true; tiltBtn.classList.add("on");
+    tiltBtn.innerHTML = '📱 Gyro Tilt: ON <span class="hint">tilt any direction · stationary only</span>';
+  } else {
+    disableTilt();
+    tiltOn = false; tiltBtn.classList.remove("on");
+    tiltBtn.innerHTML = '📱 Gyro Tilt: OFF <span class="hint">tilt any direction · stationary only</span>';
+  }
+});
+/* stop sending tilt if the socket drops (robot side also decays it to 0) */
+window.addEventListener("beforeunload", ()=>{ if(tiltOn) disableTilt(); });
 
 /* --- block page scroll/zoom --- */
 document.body.addEventListener("touchmove", e=>e.preventDefault(), {passive:false});

@@ -142,6 +142,15 @@ COXA_DELTA_BIAS = {
 # Positive strafe command means move right; we apply opposite-side body tilt.
 LATERAL_COXA_OPPOSE_GAIN = 2.5
 
+# --- Phone/tablet gyro tilt (stationary only) ---
+# When idle, the robot mirrors the phone's orientation on BOTH axes, using the
+# same per-leg dz geometry as the stability controller:
+#   roll  (+ = lean right) -> right feet up / left feet down
+#   pitch (+ = nose down)  -> front feet up / rear feet down
+# plus a small coxa nudge to compensate the roll.
+TILT_MAX_Z = 0.022        # m, max foot-height delta per axis at full tilt
+TILT_COXA_GAIN = 4.0      # deg, max coxa compensation at full roll
+
 DIAG_A = ("FL", "RR")
 
 WATCHDOG_TIMEOUT = 5.0          # seconds — reduced from 15; os.execv is gone so safe to be aggressive
@@ -289,12 +298,22 @@ def apply_motion_pitch_bias(feet, pitch_bias):
 # SERVO PIPELINE
 # =====================================================================
 
-def apply_coxa_bias(deltas, strafe_cmd=0.0):
+def apply_coxa_bias(deltas, strafe_cmd=0.0, tilt_roll=0.0):
     biased = deltas.copy()
     for leg, bias in COXA_DELTA_BIAS.items():
         key = f"{leg}_COXA"
         if key in biased:
             biased[key] += bias
+
+    # Phone-gyro tilt: small coxa nudge to compensate the side-to-side lean.
+    r = max(-1.0, min(1.0, tilt_roll))
+    if abs(r) > 0.01:
+        for leg in ("FL", "FR", "RL", "RR"):
+            key = f"{leg}_COXA"
+            if key not in biased:
+                continue
+            side = +1.0 if leg in ("FL", "RL") else -1.0
+            biased[key] += r * side * TILT_COXA_GAIN
 
     # Dynamic coxa bias to oppose lateral motion (left/right stride).
     # strafe_cmd in [-1, +1]: -1 = left, +1 = right.
@@ -315,13 +334,13 @@ def send_to_servos(physical):
         set_servo_angle(ch, physical[joint])
 
 
-def execute_step(feet, strafe_cmd=0.0):
+def execute_step(feet, strafe_cmd=0.0, tilt_roll=0.0):
     # If trick thread is being aborted, suppress servo writes from the dying thread.
     if _trick_stop.is_set():
         return False
     try:
         deltas = solve_all_legs(feet)
-        deltas = apply_coxa_bias(deltas, strafe_cmd)
+        deltas = apply_coxa_bias(deltas, strafe_cmd, tilt_roll)
         deltas = apply_joint_conventions(deltas)
         physical = normalize_all(deltas)
         send_to_servos(physical)
@@ -1038,18 +1057,27 @@ def main_web(imu, brace, web):
                     execute_step(feet, last_strafe)
 
             else:
-                # idle: brace controller
+                # idle / stationary: brace controller + phone-gyro tilt (roll+pitch).
+                # (Tilt is applied ONLY here — never while walking or in a trick.)
+                roll_t, pitch_t = web.get_tilt()    # each [-1,1], (0,0) if disabled/stale
+                base = stand_at_z(current_z)
+
                 if imu is not None:
                     offsets = brace.update(imu)
                     brace_was_active = brace.active
-                    brace_feet = {
-                        leg: (x, y, z + offsets[leg])
-                        for leg, (x, y, z) in stand_at_z(current_z).items()
-                    }
-                    execute_step(brace_feet)
                 else:
-                    execute_step(stand_at_z(current_z))
+                    offsets = {leg: 0.0 for leg in base}
                     brace_was_active = False
+
+                feet = {}
+                for leg, (x, y, z) in base.items():
+                    front = 1.0 if leg in ("FL", "FR") else -1.0   # front / rear
+                    right = 1.0 if leg in ("FR", "RR") else -1.0   # right / left
+                    # pitch reversed per request (roll unchanged); +roll -> right lower
+                    dz_tilt = -pitch_t * TILT_MAX_Z * front + roll_t * TILT_MAX_Z * right
+                    feet[leg] = (x, y, z + offsets[leg] + dz_tilt)
+
+                execute_step(feet, 0.0, roll_t)
 
             time.sleep(max(0, DT - (time.time() - loop_top)))
 
@@ -1367,7 +1395,9 @@ def main():
 
     ip = get_lan_ip()
     print(f"[WEB] Open this on your phone:")
-    print(f"[WEB] http://{ip}:8000")
+    print(f"[WEB] {web.scheme}://{ip}:8000")
+    if web.scheme == "https":
+        print("[WEB] (self-signed cert — accept the browser 'not secure' warning once)")
     print("[WEB] Keep the phone and Jetson on the same Wi-Fi network.")
 
     watchdog_last_heartbeat[0] = time.time()
