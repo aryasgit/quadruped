@@ -19,6 +19,7 @@ the rest keep working.
 """
 
 import math
+import os
 import threading
 import time
 from pathlib import Path
@@ -31,8 +32,13 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 import uvicorn
 
-RGB_SIZE = (640, 400)
-DEPTH_RANGE_MM = 5000.0
+# MAX_PERF: one-off "everything on" mode (OAK_MAX=1). Default stays the cool v1 config.
+MAX_PERF = os.environ.get("OAK_MAX", "0") == "1"
+RGB_SIZE  = (1280, 720) if MAX_PERF else (640, 400)   # display/output size
+MONO_SIZE = (1280, 800) if MAX_PERF else (640, 400)   # stereo input (depth detail)
+DEPTH_OUT = (640, 400)                                 # depth stream size (keep encode sane)
+TARGET_FPS = 30 if MAX_PERF else 15
+DEPTH_RANGE_MM = 6000.0
 JPEG_Q = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
 
 
@@ -101,7 +107,7 @@ class OakHub:
 
             # --- RGB ---
             cam = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
-            rgb_out = cam.requestOutput(RGB_SIZE, dai.ImgFrame.Type.NV12)
+            rgb_out = cam.requestOutput(RGB_SIZE, dai.ImgFrame.Type.NV12, fps=TARGET_FPS)
             rgb_q = rgb_out.createOutputQueue()
 
             # --- Stereo depth (guarded) ---
@@ -109,12 +115,32 @@ class OakHub:
             try:
                 mono_l = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_B)
                 mono_r = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
+                preset = (dai.node.StereoDepth.PresetMode.HIGH_DETAIL if MAX_PERF
+                          else dai.node.StereoDepth.PresetMode.DEFAULT)
                 stereo = pipeline.create(dai.node.StereoDepth).build(
-                    left=mono_l.requestOutput(RGB_SIZE),
-                    right=mono_r.requestOutput(RGB_SIZE),
-                    presetMode=dai.node.StereoDepth.PresetMode.DEFAULT,
+                    left=mono_l.requestOutput(MONO_SIZE, fps=TARGET_FPS),
+                    right=mono_r.requestOutput(MONO_SIZE, fps=TARGET_FPS),
+                    presetMode=preset,
                 )
-                stereo.setOutputSize(*RGB_SIZE)
+                stereo.setOutputSize(*DEPTH_OUT)
+                if MAX_PERF:
+                    # everything on: high-res mono in, subpixel + LR check, and a
+                    # density-oriented post-processing chain.
+                    try: stereo.setLeftRightCheck(True)
+                    except Exception: pass
+                    try: stereo.setSubpixel(True)
+                    except Exception: pass
+                    try:
+                        pp = stereo.initialConfig.postProcessing
+                        pp.speckleFilter.enable = True
+                        pp.temporalFilter.enable = True
+                        pp.spatialFilter.enable = True
+                        pp.spatialFilter.holeFillingRadius = 2
+                        pp.spatialFilter.numIterations = 1
+                        try: pp.holeFilling.enable = True
+                        except Exception: pass
+                    except Exception as e:
+                        print(f"[OAK] max post-processing skipped: {e}")
                 depth_q = stereo.depth.createOutputQueue()
             except Exception as e:
                 print(f"[OAK] depth disabled: {e}")
@@ -142,6 +168,16 @@ class OakHub:
                 print(f"[OAK] system logger disabled: {e}")
 
             pipeline.start()
+            try:
+                if MAX_PERF:
+                    # full IR dot projector — dense depth on textureless surfaces
+                    device.setIrLaserDotProjectorIntensity(1.0)
+                    device.setIrFloodLightIntensity(0.3)
+                else:
+                    device.setIrLaserDotProjectorIntensity(0.0)
+                    device.setIrFloodLightIntensity(0.0)
+            except Exception:
+                pass
             with self._lock:
                 self._tel["ok"] = True
 

@@ -3,114 +3,239 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OAK-D Pro — Telemetry</title>
+<title>OAK-D // TELEMETRY CONSOLE</title>
 <style>
-  :root{--bg:#0b0d12;--panel:#151a24;--panel2:#1d2431;--line:#29313f;--txt:#eaf0f8;
-    --dim:#8a93a6;--accent:#6ea8ff;--good:#31c48d;--warn:#f5a524;--hot:#ef4444;}
+  :root{
+    --bg:#000000; --panel:#000000; --panel2:#040a04; --line:#0e3d18; --line2:#166322;
+    --txt:#33ff5e; --dim:#1c7a33; --accent:#33ff5e; --accent2:#66ff8a;
+    --red:#ff3b3b; --hot:#ff3b3b; --good:#33ff5e;
+    --mono:'JetBrains Mono','Fira Code','SF Mono','DejaVu Sans Mono','Consolas','Courier New',monospace;
+  }
   *{box-sizing:border-box;}
-  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);
-    color:var(--txt);padding:16px;}
-  h1{font-size:18px;margin:0 0 4px;}
-  .sub{color:var(--dim);font-size:13px;margin-bottom:16px;}
-  .sub b{color:var(--txt);}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-  @media(max-width:820px){.grid{grid-template-columns:1fr;}}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
-  .card h2{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;
-    margin:0;padding:12px 14px;border-bottom:1px solid var(--line);display:flex;
-    justify-content:space-between;}
-  .card h2 .fps{color:var(--good);}
-  .feed{width:100%;display:block;background:#000;aspect-ratio:16/10;object-fit:contain;}
-  .tel{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);}
-  .metric{background:var(--panel);padding:12px 14px;}
-  .metric .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;}
-  .metric .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px;}
-  .metric .v small{font-size:12px;color:var(--dim);font-weight:500;}
-  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);}
-  .row3 .metric .v{font-size:18px;}
-  .status{display:inline-flex;align-items:center;gap:6px;font-size:13px;}
-  .dot{width:9px;height:9px;border-radius:50%;background:var(--hot);}
-  .dot.ok{background:var(--good);}
-  .bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:6px;}
-  .bar > i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg); color:var(--txt); font-family:var(--mono);
+    font-size:13px; letter-spacing:.3px; padding:12px; overflow-x:hidden;
+  }
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.18) 2px 3px);
+    mix-blend-mode:overlay;opacity:.5;}
+  .flick{animation:flick 4s infinite;}
+  @keyframes flick{0%,97%,100%{opacity:1}98%{opacity:.65}99%{opacity:.9}}
+
+  .hdr{display:flex;align-items:stretch;gap:12px;margin-bottom:12px;}
+  .hdr .clock{font-size:34px;font-weight:700;color:var(--accent2);
+    text-shadow:0 0 12px rgba(51,255,94,.4);padding:4px 18px;
+    border:1px solid var(--line2);background:var(--panel);letter-spacing:2px;}
+  .hdr .banner{flex:1;padding:6px 16px;border:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;justify-content:center;}
+  .hdr .banner .b1{color:var(--accent);font-weight:700;letter-spacing:3px;font-size:15px;}
+  .hdr .banner .b2{color:var(--dim);font-size:11px;margin-top:2px;}
+  .hdr .stat{min-width:210px;padding:8px 14px;border:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;justify-content:center;gap:3px;}
+  .hdr .stat .line{display:flex;justify-content:space-between;}
+  .hdr .stat .k{color:var(--dim);} .hdr .stat .val{color:var(--txt);}
+  .led{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);
+    box-shadow:0 0 8px currentColor;margin-right:6px;vertical-align:middle;color:var(--red);}
+  .led.ok{background:var(--good);color:var(--good);}
+
+  .grid{display:grid;grid-template-columns:1.4fr 1.4fr 1fr;gap:12px;}
+  @media(max-width:1000px){.grid{grid-template-columns:1fr;}}
+
+  .panel{position:relative;background:var(--panel);border:1px solid var(--line);}
+  .panel::before,.panel::after{content:"";position:absolute;width:10px;height:10px;
+    border:2px solid var(--accent);opacity:.6;}
+  .panel::before{top:-1px;left:-1px;border-right:none;border-bottom:none;}
+  .panel::after{bottom:-1px;right:-1px;border-left:none;border-top:none;}
+  .ptitle{display:flex;justify-content:space-between;align-items:center;
+    padding:6px 12px;border-bottom:1px solid var(--line);color:var(--accent);
+    font-size:11px;letter-spacing:2px;text-transform:uppercase;background:var(--panel2);}
+  .ptitle .tag{color:var(--accent2);}
+  .pbody{padding:10px 12px;}
+
+  .feed{width:100%;display:block;background:#000;aspect-ratio:16/10;object-fit:contain;
+    filter:contrast(1.05);}
+  .feed.dep{filter:contrast(1.1) saturate(1.2);}
+
+  .big3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin-bottom:10px;}
+  .big3 .cell{border:1px solid var(--line);padding:6px 2px;background:var(--panel2);}
+  .big3 .k{color:var(--dim);font-size:10px;letter-spacing:1px;}
+  .big3 .v{font-size:24px;font-weight:700;color:var(--accent2);
+    text-shadow:0 0 8px rgba(51,255,94,.35);}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;}
+  .kv .k{color:var(--dim);} .kv .v{color:var(--txt);text-align:right;font-variant-numeric:tabular-nums;}
+  .barrow{display:flex;align-items:center;gap:8px;margin:6px 0;}
+  .barrow .lbl{color:var(--dim);width:52px;font-size:11px;}
+  .bar{flex:1;height:10px;background:var(--panel2);border:1px solid var(--line);position:relative;}
+  .bar > i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s;}
+  .bar.warn > i{background:var(--red);opacity:.7;}
+  .bar.hot  > i{background:var(--red);}
+  .barrow .num{width:64px;text-align:right;font-variant-numeric:tabular-nums;}
+
+  canvas{display:block;width:100%;}
+  .cap{color:var(--dim);font-size:10px;letter-spacing:1px;margin-top:4px;}
+  .cursor{display:inline-block;width:8px;height:14px;background:var(--accent);
+    vertical-align:middle;animation:blink 1s steps(1) infinite;}
+  @keyframes blink{50%{opacity:0}}
 </style>
 </head>
 <body>
-  <h1>OAK-D Pro · Live Telemetry</h1>
-  <div class="sub">
-    <span class="status"><span class="dot" id="dot"></span><span id="statusTxt">connecting…</span></span>
-    &nbsp;·&nbsp; device <b id="dev">-</b> &nbsp;·&nbsp; USB <b id="usb">-</b>
+  <div class="hdr">
+    <div class="clock flick" id="clock">--:--:--</div>
+    <div class="banner">
+      <div class="b1">OAK-D&nbsp;PRO&nbsp;//&nbsp;PERCEPTION&nbsp;TELEMETRY&nbsp;CONSOLE</div>
+      <div class="b2" id="banner2">luxonis myriad-x · depthai v3 · initializing<span class="cursor"></span></div>
+    </div>
+    <div class="stat">
+      <div class="line"><span class="k">LINK</span><span class="val"><span class="led" id="led"></span><span id="linkTxt">—</span></span></div>
+      <div class="line"><span class="k">USB</span><span class="val" id="usb">—</span></div>
+      <div class="line"><span class="k">DEVICE</span><span class="val" id="dev">—</span></div>
+    </div>
   </div>
 
   <div class="grid">
-    <div class="card">
-      <h2>RGB Camera <span class="fps" id="rgbFps">0 fps</span></h2>
-      <img class="feed" id="rgb" src="/rgb" alt="rgb"/>
-    </div>
-    <div class="card">
-      <h2>Stereo Depth <span class="fps" id="depFps">0 fps</span></h2>
-      <img class="feed" id="depth" src="/depth" alt="depth"/>
+    <div class="panel">
+      <div class="ptitle"><span>▚ RGB&nbsp;SENSOR&nbsp;·&nbsp;CAM_A</span><span class="tag" id="rgbFps">0 FPS</span></div>
+      <div class="pbody" style="padding:0"><img class="feed" id="rgb" src="/rgb" alt="rgb"/></div>
     </div>
 
-    <div class="card">
-      <h2>IMU · Orientation (BNO086)</h2>
-      <div class="row3">
-        <div class="metric"><div class="k">Roll</div><div class="v"><span id="roll">0</span><small>°</small></div></div>
-        <div class="metric"><div class="k">Pitch</div><div class="v"><span id="pitch">0</span><small>°</small></div></div>
-        <div class="metric"><div class="k">Yaw</div><div class="v"><span id="yaw">0</span><small>°</small></div></div>
-      </div>
-      <div class="row3">
-        <div class="metric"><div class="k">Accel X</div><div class="v" id="ax">0<small> m/s²</small></div></div>
-        <div class="metric"><div class="k">Accel Y</div><div class="v" id="ay">0</div></div>
-        <div class="metric"><div class="k">Accel Z</div><div class="v" id="az">0</div></div>
-      </div>
-      <div class="row3">
-        <div class="metric"><div class="k">Gyro X</div><div class="v" id="gx">0<small> rad/s</small></div></div>
-        <div class="metric"><div class="k">Gyro Y</div><div class="v" id="gy">0</div></div>
-        <div class="metric"><div class="k">Gyro Z</div><div class="v" id="gz">0</div></div>
-      </div>
+    <div class="panel">
+      <div class="ptitle"><span>▚ STEREO&nbsp;DEPTH&nbsp;·&nbsp;CAM_B/C</span><span class="tag" id="depFps">0 FPS</span></div>
+      <div class="pbody" style="padding:0"><img class="feed dep" id="depth" src="/depth" alt="depth"/></div>
     </div>
 
-    <div class="card">
-      <h2>System &amp; Depth</h2>
-      <div class="tel">
-        <div class="metric"><div class="k">Chip Temp</div><div class="v"><span id="temp">0</span><small>°C</small></div></div>
-        <div class="metric"><div class="k">Leon CPU</div><div class="v"><span id="cpu">0</span><small>%</small></div></div>
-        <div class="metric">
-          <div class="k">DDR Memory</div>
-          <div class="v"><span id="mem">0</span><small> MB</small></div>
-          <div class="bar"><i id="memBar"></i></div>
+    <div class="panel">
+      <div class="ptitle"><span>▚ ATTITUDE&nbsp;·&nbsp;BNO086</span><span class="tag">IMU</span></div>
+      <div class="pbody">
+        <canvas id="horizon" width="300" height="150" style="border:1px solid var(--line);background:#000;"></canvas>
+        <div class="big3" style="margin-top:10px">
+          <div class="cell"><div class="k">ROLL</div><div class="v" id="roll">0°</div></div>
+          <div class="cell"><div class="k">PITCH</div><div class="v" id="pitch">0°</div></div>
+          <div class="cell"><div class="k">YAW</div><div class="v" id="yaw">0°</div></div>
         </div>
-        <div class="metric"><div class="k">Center Distance</div><div class="v"><span id="center">0</span><small> mm</small></div></div>
+        <div class="kv">
+          <span class="k">accel&nbsp;m/s²</span><span class="v" id="acc">0.00 · 0.00 · 0.00</span>
+          <span class="k">gyro&nbsp;rad/s</span><span class="v" id="gyr">0.00 · 0.00 · 0.00</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><span>▚ SYSTEM&nbsp;·&nbsp;MYRIAD-X</span><span class="tag">RUN</span></div>
+      <div class="pbody">
+        <div class="barrow"><span class="lbl">TEMP</span><div class="bar" id="tempBar"><i></i></div><span class="num"><span id="temp">0</span>°C</span></div>
+        <div class="barrow"><span class="lbl">LEON</span><div class="bar" id="cpuBar"><i></i></div><span class="num"><span id="cpu">0</span>%</span></div>
+        <div class="barrow"><span class="lbl">DDR</span><div class="bar" id="memBar"><i></i></div><span class="num"><span id="mem">0/0</span></span></div>
+        <canvas id="gTemp" width="300" height="46"></canvas>
+        <div class="cap">CHIP TEMPERATURE · °C · 60s</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><span>▚ CAPTURE&nbsp;RATE</span><span class="tag">FPS</span></div>
+      <div class="pbody">
+        <canvas id="gFps" width="300" height="70"></canvas>
+        <div class="cap"><span style="color:var(--accent)">▇ RGB</span> &nbsp; <span style="color:var(--red)">▇ DEPTH</span> &nbsp; · 60s</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><span>▚ RANGE&nbsp;FINDER</span><span class="tag">MM</span></div>
+      <div class="pbody">
+        <div class="big3" style="grid-template-columns:1fr 1fr">
+          <div class="cell"><div class="k">CENTER</div><div class="v"><span id="center">0</span></div></div>
+          <div class="cell"><div class="k">NEAREST</div><div class="v"><span id="near">0</span></div></div>
+        </div>
+        <canvas id="gDepth" width="300" height="56"></canvas>
+        <div class="cap">CENTER DISTANCE · mm · 60s</div>
       </div>
     </div>
   </div>
 
 <script>
-const $ = id => document.getElementById(id);
-function set(id, v){ const e=$(id); if(e) e.textContent = v; }
+const $=id=>document.getElementById(id);
+const N=120;
+const H={temp:[],cpu:[],rgb:[],dep:[],depth:[]};
+function push(a,v){a.push(v); if(a.length>N)a.shift();}
+
+setInterval(()=>{$("clock").textContent=new Date().toTimeString().slice(0,8);},1000);
+
+const GREEN="#33ff5e", RED="#ff3b3b", GRID="rgba(28,122,51,.45)";
+function spark(cid,series,opts){
+  const c=$(cid); if(!c)return; const ctx=c.getContext("2d");
+  const W=c.width,Hh=c.height; ctx.clearRect(0,0,W,Hh);
+  ctx.strokeStyle=GRID;ctx.lineWidth=1;
+  for(let gy=0;gy<=2;gy++){const y=gy/2*(Hh-1)+.5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  series.forEach(s=>{
+    const arr=s.data; if(arr.length<2)return;
+    let mn=opts.min, mx=opts.max;
+    if(mn==null)mn=Math.min(...arr); if(mx==null)mx=Math.max(...arr);
+    if(mx-mn<1e-6)mx=mn+1;
+    const x=i=>i/(N-1)*(W-1), y=v=>Hh-1-((v-mn)/(mx-mn))*(Hh-3)-1;
+    ctx.beginPath();ctx.moveTo(x(N-arr.length),y(arr[0]));
+    arr.forEach((v,i)=>ctx.lineTo(x(N-arr.length+i),y(v)));
+    ctx.lineTo(x(N-1),Hh);ctx.lineTo(x(N-arr.length),Hh);ctx.closePath();
+    ctx.fillStyle=s.fill;ctx.fill();
+    ctx.beginPath();ctx.moveTo(x(N-arr.length),y(arr[0]));
+    arr.forEach((v,i)=>ctx.lineTo(x(N-arr.length+i),y(v)));
+    ctx.strokeStyle=s.color;ctx.lineWidth=1.6;ctx.stroke();
+  });
+}
+
+function horizon(roll,pitch){
+  const c=$("horizon"),ctx=c.getContext("2d");
+  const W=c.width,Hh=c.height,cx=W/2,cy=Hh/2;
+  ctx.clearRect(0,0,W,Hh);
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W,Hh);ctx.clip();
+  ctx.translate(cx,cy);ctx.rotate(-roll*Math.PI/180);
+  const po=Math.max(-Hh,Math.min(Hh,pitch*2.2));
+  ctx.fillStyle="#000";ctx.fillRect(-W,-Hh*2+po,W*2,Hh*2);        // sky (black)
+  ctx.fillStyle="#031a08";ctx.fillRect(-W,po,W*2,Hh*2);          // ground (dark green)
+  ctx.strokeStyle=GREEN;ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(-W,po);ctx.lineTo(W,po);ctx.stroke();
+  ctx.strokeStyle="rgba(51,255,94,.5)";ctx.fillStyle=GREEN;ctx.font="9px monospace";ctx.lineWidth=1;
+  for(let p=-30;p<=30;p+=10){ if(p===0)continue; const yy=po-p*2.2;
+    ctx.beginPath();ctx.moveTo(-24,yy);ctx.lineTo(24,yy);ctx.stroke();
+    ctx.fillText(Math.abs(p),28,yy+3);}
+  ctx.restore();
+  ctx.strokeStyle=RED;ctx.lineWidth=2;                            // aircraft mark (red)
+  ctx.beginPath();ctx.moveTo(cx-34,cy);ctx.lineTo(cx-10,cy);
+  ctx.moveTo(cx+10,cy);ctx.lineTo(cx+34,cy);
+  ctx.moveTo(cx,cy-6);ctx.lineTo(cx,cy);ctx.stroke();
+}
+
+function setBar(id,pct,warn,hot){
+  const b=$(id);b.classList.toggle("warn",pct>=warn&&pct<hot);b.classList.toggle("hot",pct>=hot);
+  b.querySelector("i").style.width=Math.max(0,Math.min(100,pct))+"%";
+}
 
 async function poll(){
   try{
-    const t = await (await fetch("/telemetry", {cache:"no-store"})).json();
-    $("dot").classList.toggle("ok", !!t.ok);
-    $("statusTxt").textContent = t.ok ? "streaming" : (t.error || "starting…");
-    set("dev", t.device); set("usb", t.usb);
-    set("rgbFps", t.rgb_fps + " fps"); set("depFps", t.depth_fps + " fps");
-    const im = t.imu;
-    set("roll", im.roll); set("pitch", im.pitch); set("yaw", im.yaw);
-    set("ax", im.ax); set("ay", im.ay); set("az", im.az);
-    set("gx", im.gx); set("gy", im.gy); set("gz", im.gz);
-    const s = t.sys;
-    set("temp", s.temp); set("cpu", s.cpu);
-    set("mem", s.mem_used + " / " + s.mem_total);
-    if(s.mem_total) $("memBar").style.width = (100*s.mem_used/s.mem_total).toFixed(0)+"%";
-    set("center", t.depth.center_mm);
-  }catch(e){
-    $("dot").classList.remove("ok"); $("statusTxt").textContent = "disconnected";
-  }
+    const t=await (await fetch("/telemetry",{cache:"no-store"})).json();
+    $("led").classList.toggle("ok",!!t.ok);
+    $("linkTxt").textContent=t.ok?"STREAMING":(t.error?"FAULT":"BOOT");
+    $("usb").textContent=t.usb; $("dev").textContent=t.device;
+    $("banner2").innerHTML="luxonis myriad-x · depthai v3 · online";
+    $("rgbFps").textContent=t.rgb_fps+" FPS"; $("depFps").textContent=t.depth_fps+" FPS";
+    const im=t.imu;
+    $("roll").textContent=im.roll+"°"; $("pitch").textContent=im.pitch+"°"; $("yaw").textContent=im.yaw+"°";
+    $("acc").textContent=`${im.ax} · ${im.ay} · ${im.az}`;
+    $("gyr").textContent=`${im.gx} · ${im.gy} · ${im.gz}`;
+    horizon(im.roll,im.pitch);
+    const s=t.sys;
+    $("temp").textContent=s.temp; $("cpu").textContent=s.cpu;
+    $("mem").textContent=s.mem_used+"/"+s.mem_total;
+    setBar("tempBar",s.temp,55,70); setBar("cpuBar",s.cpu,70,90);
+    setBar("memBar",s.mem_total?100*s.mem_used/s.mem_total:0,70,90);
+    $("center").textContent=t.depth.center_mm; $("near").textContent=t.depth.min_mm;
+    push(H.temp,s.temp);push(H.cpu,s.cpu);push(H.rgb,t.rgb_fps);push(H.dep,t.depth_fps);push(H.depth,t.depth.center_mm);
+    spark("gTemp",[{data:H.temp,color:RED,fill:"rgba(255,59,59,.12)"}],{min:20,max:80});
+    spark("gFps",[{data:H.rgb,color:GREEN,fill:"rgba(51,255,94,.12)"},
+                  {data:H.dep,color:RED,fill:"rgba(255,59,59,.08)"}],{min:0,max:35});
+    spark("gDepth",[{data:H.depth,color:GREEN,fill:"rgba(51,255,94,.12)"}],{min:0,max:null});
+  }catch(e){ $("led").classList.remove("ok"); $("linkTxt").textContent="OFFLINE"; }
 }
-setInterval(poll, 250); poll();
+setInterval(poll,250); poll();
 </script>
 </body>
 </html>

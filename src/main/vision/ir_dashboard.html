@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IR // TELEMETRY CONSOLE</title>
+<style>
+  :root{
+    --bg:#000000; --panel:#000000; --panel2:#040a04; --line:#0e3d18; --line2:#166322;
+    --txt:#33ff5e; --dim:#1c7a33; --accent:#33ff5e; --accent2:#66ff8a; --red:#ff3b3b;
+    --mono:'JetBrains Mono','Fira Code','SF Mono','DejaVu Sans Mono','Consolas','Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--txt);font-family:var(--mono);font-size:13px;
+    letter-spacing:.3px;padding:12px;overflow-x:hidden;}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.18) 2px 3px);
+    mix-blend-mode:overlay;opacity:.5;}
+  .flick{animation:flick 4s infinite;}@keyframes flick{0%,97%,100%{opacity:1}98%{opacity:.65}99%{opacity:.9}}
+  .hdr{display:flex;align-items:stretch;gap:12px;margin-bottom:12px;}
+  .hdr .clock{font-size:34px;font-weight:700;color:var(--accent2);text-shadow:0 0 12px rgba(51,255,94,.4);
+    padding:4px 18px;border:1px solid var(--line2);background:var(--panel);letter-spacing:2px;}
+  .hdr .banner{flex:1;padding:6px 16px;border:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;justify-content:center;}
+  .hdr .banner .b1{color:var(--accent);font-weight:700;letter-spacing:3px;font-size:15px;}
+  .hdr .banner .b2{color:var(--dim);font-size:11px;margin-top:2px;}
+  .hdr .stat{min-width:210px;padding:8px 14px;border:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;justify-content:center;gap:3px;}
+  .hdr .stat .line{display:flex;justify-content:space-between;}
+  .hdr .stat .k{color:var(--dim);}
+  .led{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);
+    box-shadow:0 0 8px currentColor;color:var(--red);margin-right:6px;vertical-align:middle;}
+  .led.ok{background:var(--accent);color:var(--accent);}
+  .grid{display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:12px;}
+  @media(max-width:1000px){.grid{grid-template-columns:1fr;}}
+  .panel{position:relative;background:var(--panel);border:1px solid var(--line);}
+  .panel::before,.panel::after{content:"";position:absolute;width:10px;height:10px;
+    border:2px solid var(--accent);opacity:.6;}
+  .panel::before{top:-1px;left:-1px;border-right:none;border-bottom:none;}
+  .panel::after{bottom:-1px;right:-1px;border-left:none;border-top:none;}
+  .ptitle{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;
+    border-bottom:1px solid var(--line);color:var(--accent);font-size:11px;letter-spacing:2px;
+    text-transform:uppercase;background:var(--panel2);}
+  .ptitle .tag{color:var(--accent2);}
+  .feed{width:100%;display:block;background:#000;aspect-ratio:4/3;object-fit:contain;}
+  .pbody{padding:10px 12px;}
+  .big3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin-bottom:10px;}
+  .big3 .cell{border:1px solid var(--line);padding:6px 2px;background:var(--panel2);}
+  .big3 .k{color:var(--dim);font-size:10px;letter-spacing:1px;}
+  .big3 .v{font-size:22px;font-weight:700;color:var(--accent2);text-shadow:0 0 8px rgba(51,255,94,.35);}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;}
+  .kv .k{color:var(--dim);}.kv .v{color:var(--txt);text-align:right;font-variant-numeric:tabular-nums;}
+  .barrow{display:flex;align-items:center;gap:8px;margin:6px 0;}
+  .barrow .lbl{color:var(--dim);width:52px;font-size:11px;}
+  .bar{flex:1;height:10px;background:var(--panel2);border:1px solid var(--line);}
+  .bar > i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s;}
+  canvas{display:block;width:100%;}
+  .cap{color:var(--dim);font-size:10px;letter-spacing:1px;margin-top:4px;}
+  .cursor{display:inline-block;width:8px;height:14px;background:var(--accent);vertical-align:middle;
+    animation:blink 1s steps(1) infinite;}@keyframes blink{50%{opacity:0}}
+</style>
+</head>
+<body>
+  <div class="hdr">
+    <div class="clock flick" id="clock">--:--:--</div>
+    <div class="banner">
+      <div class="b1">IR&nbsp;CAMERA&nbsp;//&nbsp;THERMAL&nbsp;TELEMETRY&nbsp;CONSOLE</div>
+      <div class="b2" id="banner2">uvc infrared · v4l2 · /dev/video0<span class="cursor"></span></div>
+    </div>
+    <div class="stat">
+      <div class="line"><span class="k">LINK</span><span><span class="led" id="led"></span><span id="linkTxt">—</span></span></div>
+      <div class="line"><span class="k">RES</span><span id="res">—</span></div>
+      <div class="line"><span class="k">RATE</span><span id="fps">—</span></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="ptitle"><span>▚ IR&nbsp;RAW</span><span class="tag">V4L2</span></div>
+      <div class="pbody" style="padding:0"><img class="feed" id="raw" src="/feed" alt="raw"/></div>
+    </div>
+    <div class="panel">
+      <div class="ptitle"><span>▚ THERMAL&nbsp;·&nbsp;HOTSPOT&nbsp;TRACK</span><span class="tag">INFERNO</span></div>
+      <div class="pbody" style="padding:0"><img class="feed" id="therm" src="/thermal" alt="thermal"/></div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><span>▚ INTENSITY</span><span class="tag">0-255</span></div>
+      <div class="pbody">
+        <div class="big3">
+          <div class="cell"><div class="k">MEAN</div><div class="v" id="mean">0</div></div>
+          <div class="cell"><div class="k">PEAK</div><div class="v" id="max">0</div></div>
+          <div class="cell"><div class="k">HOT&nbsp;VAL</div><div class="v" id="hotv">0</div></div>
+        </div>
+        <div class="barrow"><span class="lbl">MEAN</span><div class="bar"><i id="meanBar"></i></div></div>
+        <div class="barrow"><span class="lbl">PEAK</span><div class="bar"><i id="maxBar"></i></div></div>
+        <div class="kv" style="margin-top:8px">
+          <span class="k">hotspot x,y</span><span class="v" id="hotxy">0 , 0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="grid-column:span 2">
+      <div class="ptitle"><span>▚ INTENSITY&nbsp;HISTOGRAM</span><span class="tag">32 BINS</span></div>
+      <div class="pbody"><canvas id="hist" width="600" height="90"></canvas>
+        <div class="cap">PIXEL DISTRIBUTION · dark ← intensity → bright</div></div>
+    </div>
+  </div>
+
+<script>
+const $=id=>document.getElementById(id);
+setInterval(()=>{$("clock").textContent=new Date().toTimeString().slice(0,8);},1000);
+const GREEN="#33ff5e";
+function drawHist(bins){
+  const c=$("hist"),ctx=c.getContext("2d"),W=c.width,Hh=c.height;
+  ctx.clearRect(0,0,W,Hh);
+  ctx.strokeStyle="rgba(28,122,51,.4)";
+  for(let g=0;g<=2;g++){const y=g/2*(Hh-1)+.5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  const bw=W/bins.length;
+  bins.forEach((v,i)=>{const bh=v/100*(Hh-2);
+    ctx.fillStyle=GREEN;ctx.globalAlpha=.85;
+    ctx.fillRect(i*bw+1,Hh-bh,bw-2,bh);ctx.globalAlpha=1;});
+}
+async function poll(){
+  try{
+    const t=await (await fetch("/telemetry",{cache:"no-store"})).json();
+    $("led").classList.toggle("ok",!!t.ok);
+    $("linkTxt").textContent=t.ok?"STREAMING":(t.error||"BOOT");
+    $("res").textContent=t.res; $("fps").textContent=t.fps+" fps";
+    $("banner2").innerHTML="uvc infrared · v4l2 · /dev/video0 · online";
+    $("mean").textContent=t.mean; $("max").textContent=t.max; $("hotv").textContent=t.hot.v;
+    $("meanBar").style.width=(t.mean/255*100)+"%";
+    $("maxBar").style.width=(t.max/255*100)+"%";
+    $("hotxy").textContent=t.hot.x+" , "+t.hot.y;
+    drawHist(t.hist);
+  }catch(e){ $("led").classList.remove("ok"); $("linkTxt").textContent="OFFLINE"; }
+}
+setInterval(poll,250); poll();
+</script>
+</body>
+</html>

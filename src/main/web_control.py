@@ -1400,6 +1400,14 @@ def main():
         print("[WEB] (self-signed cert — accept the browser 'not secure' warning once)")
     print("[WEB] Keep the phone and Jetson on the same Wi-Fi network.")
 
+    # Auto-launch camera telemetry dashboard(s) for whatever cameras are plugged in.
+    try:
+        from vision.autolaunch import launch_dashboards
+        for name, port in launch_dashboards():
+            print(f"[WEB] {name} telemetry: http://{ip}:{port}")
+    except Exception as e:
+        print(f"[WEB] telemetry autolaunch skipped: {e}")
+
     watchdog_last_heartbeat[0] = time.time()
     threading.Thread(target=watchdog_thread, daemon=True).start()
 
